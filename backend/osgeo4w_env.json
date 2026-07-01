@@ -1,0 +1,5 @@
+{
+  "PATH": "C:\\PROGRA~1\\QGIS34~1.11\\apps\\qt5\\bin;C:\\PROGRA~1\\QGIS34~1.11\\apps\\Python312\\Scripts;C:\\PROGRA~1\\QGIS34~1.11\\bin;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\system32\\WBem",
+  "GDAL_DATA": "C:\\PROGRA~1\\QGIS34~1.11\\apps\\gdal\\share\\gdal",
+  "PROJ_LIB": "C:\\Program Files\\PostgreSQL\\18\\share\\contrib\\postgis-3.6\\proj"
+}

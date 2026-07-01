@@ -1,0 +1,233 @@
+{
+  "students": [
+    {
+      "full_name": "Taigbenu Efezino",
+      "matric_number": "BU22CSC1136",
+      "is_staff_admin": false
+    },
+    {
+      "full_name": "Campus Admin",
+      "matric_number": "ADMIN001",
+      "is_staff_admin": true
+    }
+  ],
+  "categories": [
+    {
+      "name": "Academic",
+      "color": "#1D4ED8",
+      "icon_identifier": "school",
+      "description": "Colleges, departments, lecture spaces, and study buildings."
+    },
+    {
+      "name": "Administrative",
+      "color": "#0F766E",
+      "icon_identifier": "briefcase",
+      "description": "Offices and university administration facilities."
+    },
+    {
+      "name": "Residential",
+      "color": "#7C3AED",
+      "icon_identifier": "home",
+      "description": "Student hostels and residential blocks."
+    },
+    {
+      "name": "Health",
+      "color": "#DC2626",
+      "icon_identifier": "heart-pulse",
+      "description": "Health, safety, and student support facilities."
+    },
+    {
+      "name": "Recreation",
+      "color": "#EA580C",
+      "icon_identifier": "trees",
+      "description": "Food, worship, sports, and common social spaces."
+    },
+    {
+      "name": "Transport",
+      "color": "#334155",
+      "icon_identifier": "navigation",
+      "description": "Gates, paths, and campus movement landmarks."
+    }
+  ],
+  "buildings": [
+    {
+      "name": "Main Gate",
+      "description": "Primary public entrance into Bowen University, Iwo.",
+      "latitude": 7.6218,
+      "longitude": 4.18733
+    },
+    {
+      "name": "Senate Building",
+      "description": "Central administrative building for university leadership and records.",
+      "latitude": 7.6245,
+      "longitude": 4.18865
+    },
+    {
+      "name": "Timothy Olagbenro Library",
+      "description": "Main university library and academic research facility.",
+      "latitude": 7.62408,
+      "longitude": 4.18918
+    },
+    {
+      "name": "Bowen Worship Centre",
+      "description": "Main chapel and worship centre on campus.",
+      "latitude": 7.62295,
+      "longitude": 4.19003
+    },
+    {
+      "name": "College of Computing and Communication Studies",
+      "description": "Academic area for computing, communication, and related programmes.",
+      "latitude": 7.6251,
+      "longitude": 4.19035
+    },
+    {
+      "name": "College of Law",
+      "description": "Academic facility for law lectures and college administration.",
+      "latitude": 7.62575,
+      "longitude": 4.18798
+    },
+    {
+      "name": "University Health Centre",
+      "description": "Student and staff health support facility.",
+      "latitude": 7.62235,
+      "longitude": 4.1884
+    },
+    {
+      "name": "Jubilee Cafeteria",
+      "description": "Campus cafeteria and student dining area.",
+      "latitude": 7.62325,
+      "longitude": 4.18943
+    },
+    {
+      "name": "288 Smart Hostel",
+      "description": "Residential hostel used in the project navigation demonstration.",
+      "latitude": 7.62192,
+      "longitude": 4.19096
+    },
+    {
+      "name": "Sports Complex",
+      "description": "Outdoor recreation and sports area.",
+      "latitude": 7.62535,
+      "longitude": 4.18692
+    }
+  ],
+  "pois": [
+    {
+      "name": "Main Gate",
+      "category": "Transport",
+      "building": "Main Gate",
+      "description": "Start point for many visitor and student navigation journeys.",
+      "operating_hours": "Open daily",
+      "icon_identifier": "navigation"
+    },
+    {
+      "name": "Senate Building",
+      "category": "Administrative",
+      "building": "Senate Building",
+      "description": "Administrative destination for records, approvals, and official enquiries.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 4:00 PM",
+      "icon_identifier": "briefcase"
+    },
+    {
+      "name": "Timothy Olagbenro Library",
+      "category": "Academic",
+      "building": "Timothy Olagbenro Library",
+      "description": "Library, reading rooms, and academic reference services.",
+      "operating_hours": "Mon-Sat, 8:00 AM - 9:00 PM",
+      "icon_identifier": "book-open"
+    },
+    {
+      "name": "Bowen Worship Centre",
+      "category": "Recreation",
+      "building": "Bowen Worship Centre",
+      "description": "Main chapel and gathering point for worship and university events.",
+      "operating_hours": "Open for scheduled services",
+      "icon_identifier": "landmark"
+    },
+    {
+      "name": "College of Computing and Communication Studies",
+      "category": "Academic",
+      "building": "College of Computing and Communication Studies",
+      "description": "College offices, laboratories, and lecture areas for computing students.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "school"
+    },
+    {
+      "name": "College of Law",
+      "category": "Academic",
+      "building": "College of Law",
+      "description": "Law faculty offices, lecture rooms, and student support points.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "scale"
+    },
+    {
+      "name": "University Health Centre",
+      "category": "Health",
+      "building": "University Health Centre",
+      "description": "Medical support, first aid, and health consultation point.",
+      "operating_hours": "24 hours",
+      "icon_identifier": "heart-pulse"
+    },
+    {
+      "name": "Jubilee Cafeteria",
+      "category": "Recreation",
+      "building": "Jubilee Cafeteria",
+      "description": "Food service and student dining area.",
+      "operating_hours": "Mon-Sat, 7:00 AM - 8:00 PM",
+      "icon_identifier": "utensils"
+    },
+    {
+      "name": "288 Smart Hostel",
+      "category": "Residential",
+      "building": "288 Smart Hostel",
+      "description": "Student residential hostel and navigation test destination.",
+      "operating_hours": "Residents only",
+      "icon_identifier": "home"
+    },
+    {
+      "name": "Sports Complex",
+      "category": "Recreation",
+      "building": "Sports Complex",
+      "description": "Outdoor sports and recreation destination.",
+      "operating_hours": "Daily, 6:00 AM - 7:00 PM",
+      "icon_identifier": "dumbbell"
+    }
+  ],
+  "tracks": [
+    {
+      "name": "Main Gate to Worship Centre",
+      "description": "Primary walking route from the campus entry area toward the chapel.",
+      "source": "seed",
+      "coordinates": [
+        [7.6218, 4.18733],
+        [7.62222, 4.18805],
+        [7.62252, 4.18902],
+        [7.62295, 4.19003]
+      ]
+    },
+    {
+      "name": "Academic Core Loop",
+      "description": "Walking path connecting the library, senate building, computing college, and law college.",
+      "source": "seed",
+      "coordinates": [
+        [7.62408, 4.18918],
+        [7.6245, 4.18865],
+        [7.6251, 4.19035],
+        [7.62575, 4.18798],
+        [7.62408, 4.18918]
+      ]
+    },
+    {
+      "name": "Hostel and Health Route",
+      "description": "Walking route from student hostel area toward health and cafeteria facilities.",
+      "source": "seed",
+      "coordinates": [
+        [7.62192, 4.19096],
+        [7.62235, 4.1884],
+        [7.62325, 4.18943],
+        [7.62408, 4.18918]
+      ]
+    }
+  ]
+}
+

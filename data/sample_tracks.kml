@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Bowen Navigator Sample Tracks</name>
+    <Placemark>
+      <name>Main Gate to Worship Centre</name>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>
+          4.18733,7.62180,0
+          4.18805,7.62222,0
+          4.18902,7.62252,0
+          4.19003,7.62295,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>
+
