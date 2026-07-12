@@ -1,6 +1,7 @@
-# Bowen Navigator
+# Bowen Navigation
 
-Bowen Navigator is a two-tier mobile campus navigation system for Bowen University, Iwo.
+A mobile campus navigation system for Bowen University, Iwo, Osun state, Nigeria.
+
 It follows the project report architecture:
 
 - Backend: Python 3, Django 4, Django REST Framework, JWT, GeoDjango, PostgreSQL, PostGIS, GDAL/ogr2ogr-ready KML ingestion, Google Directions and Places API proxying.
@@ -60,4 +61,3 @@ Matric number: ADMIN001
 - Google Directions and Places calls are proxied through Django so server-side keys are not shipped in the mobile app bundle.
 - If no Google server key is configured, `/api/directions/` returns a deterministic local walking-route fallback so the mobile UI can still be tested.
 - Use `docs/SETUP.md` for the full setup sequence and `docs/API_CONTRACT.md` for endpoint details.
-
