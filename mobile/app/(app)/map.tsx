@@ -47,6 +47,8 @@ export default function MapScreen() {
   const [routing, setRouting] = useState(false);
   const [placeDetails, setPlaceDetails] = useState<any | null>(null);
   const [fetchingDetails, setFetchingDetails] = useState(false);
+  const isNavigating = routeCoords.length > 0;
+  const [currentZoomDelta, setCurrentZoomDelta] = useState(CAMPUS_REGION.longitudeDelta);
 
   const panY = useRef(new Animated.Value(0)).current;
   const panValue = useRef(0);
@@ -102,11 +104,15 @@ export default function MapScreen() {
   ).current;
 
   const filteredPois = useMemo(() => {
-    if (!selectedCategory) {
-      return pois;
+    let result = pois;
+    if (selectedCategory) {
+      result = result.filter((poi) => poi.category.slug === selectedCategory);
+    } else if (currentZoomDelta > 0.012) {
+      // Zoomed out: declutter by showing fewer markers
+      result = result.filter((poi, index) => index % 3 === 0 || poi.id === selectedPoi?.id);
     }
-    return pois.filter((poi) => poi.category.slug === selectedCategory);
-  }, [pois, selectedCategory]);
+    return result;
+  }, [pois, selectedCategory, currentZoomDelta, selectedPoi]);
 
   const loadCampus = useCallback(async () => {
     setLoading(true);
@@ -296,6 +302,7 @@ export default function MapScreen() {
         toolbarEnabled={false}
         customMapStyle={customMapStyle}
         onMapReady={initializeLocation}
+        onRegionChangeComplete={(region) => setCurrentZoomDelta(region.longitudeDelta)}
       >
         {routeCoords.length > 1 && (
           <Polyline coordinates={routeCoords} strokeColor={colors.primary} strokeWidth={6} lineCap="round" lineJoin="round" />
@@ -321,12 +328,21 @@ export default function MapScreen() {
               description={poi.category.name}
               onPress={() => openPoi(poi)}
             >
-              <MarkerBadge
-                color={markerColor}
-                icon={poi.icon_identifier !== "map-pin" ? poi.icon_identifier : poi.category.icon_identifier}
-                selected={isSelected || isDestination}
-                size="sm"
-              />
+              <View style={styles.markerContainer}>
+                <MarkerBadge
+                  color={markerColor}
+                  icon={poi.icon_identifier !== "map-pin" ? poi.icon_identifier : poi.category.icon_identifier}
+                  selected={isSelected || isDestination}
+                  size="sm"
+                />
+                {isNavigating && (
+                  <View style={styles.transparentLabelContainer}>
+                    <Text style={styles.transparentLabelText}>
+                      {poi.name}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </Marker>
           );
         })}
@@ -650,5 +666,44 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: 3,
     fontSize: 12
+  },
+  markerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "transparent"
+  },
+  markerLabelContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.line,
+    marginLeft: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 1.5,
+    elevation: 2
+  },
+  markerLabelText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.ink
+  },
+  transparentLabelContainer: {
+    backgroundColor: "transparent",
+    marginLeft: 4,
+    justifyContent: "center",
+    width: 150,
+  },
+  transparentLabelText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: colors.ink,
+    textShadowColor: "#FFFFFF",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+    elevation: 2
   }
 });
