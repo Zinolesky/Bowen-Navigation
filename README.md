@@ -17,27 +17,26 @@ docs/         Setup, API contract, test plan, Postman collection
 scripts/      Spatial import helpers
 ```
 
+## Prerequisites
+
+To run the backend seamlessly, **you must have [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running**. 
+
+By using Docker, you completely avoid having to manually install Python, PostgreSQL, PostGIS, and complex geospatial libraries (GDAL/PROJ) on your local machine. The database and backend will run perfectly isolated in a pre-configured Linux container, eliminating "DLL Hell" and guaranteeing it works identically on Windows, Mac, and Linux.
+
 ## Fast Start
 
-1. Copy `backend/.env.example` to `backend/.env`.
-2. Add your PostgreSQL/PostGIS and Google API values.
-3. Start PostGIS with `docker compose up -d db pgadmin`.
-4. Install backend dependencies from `backend/requirements.txt`.
-5. Run migrations and seed the demo campus data:
+1. Copy `backend/.env.example` to `backend/.env` and add your Google API values.
+2. Copy `mobile/.env.example` to `mobile/.env`, then set `EXPO_PUBLIC_API_URL`.
+3. Run the automated setup script to build and launch the Dockerized backend (including PostGIS) and install mobile dependencies:
 
 ```powershell
-cd backend
-python manage.py migrate
-python manage.py seed_campus
-python manage.py runserver
+.\setup.ps1
 ```
 
-6. Copy `mobile/.env.example` to `mobile/.env`, then set `EXPO_PUBLIC_API_URL`.
-7. Install mobile dependencies and run Expo:
+4. The backend is now running on `http://localhost:8000`. To start the mobile app:
 
 ```powershell
 cd mobile
-npm install
 npx expo start
 ```
 
