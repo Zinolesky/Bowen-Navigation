@@ -77,24 +77,23 @@ def normalize_google_directions(payload: dict) -> dict:
     }
 
 
-def fallback_directions(origin: dict, destination: dict) -> dict:
-    mid_lat = (float(origin["latitude"]) + float(destination["latitude"])) / 2
-    mid_lng = (float(origin["longitude"]) + float(destination["longitude"])) / 2
+def fallback_directions(origin: dict, destination: dict, mode: str = "walking") -> dict:
     points = [
         (float(origin["latitude"]), float(origin["longitude"])),
-        (mid_lat, float(origin["longitude"])),
-        (mid_lat, mid_lng),
         (float(destination["latitude"]), float(destination["longitude"])),
     ]
     distance = haversine_meters(origin, destination)
-    minutes = max(2, round(distance / 80))
+    speed = 400 if mode == "driving" else 80
+    minutes = max(1, round(distance / speed))
+    verb = "Drive" if mode == "driving" else "Walk"
 
     return {
         "provider": "local-fallback",
+        "mode": mode,
         "status": "OK",
-        "summary": "Development route preview",
+        "summary": "Direct route preview",
         "distance_text": f"{distance / 1000:.1f} km" if distance >= 1000 else f"{distance} m",
-        "duration_text": f"{minutes} min",
+        "duration_text": f"{minutes} min" if minutes == 1 else f"{minutes} mins",
         "overview_polyline": encode_polyline(points),
         "steps": [
             {
@@ -104,10 +103,10 @@ def fallback_directions(origin: dict, destination: dict) -> dict:
                 "polyline": "",
             },
             {
-                "instruction": "Follow the highlighted walking path toward the selected point of interest.",
+                "instruction": f"{verb} toward the selected destination.",
                 "distance_text": f"{distance} m",
                 "duration_text": f"{minutes} min",
-                "polyline": "",
+                "polyline": encode_polyline(points),
             },
             {
                 "instruction": "Arrive at the selected destination.",
@@ -117,4 +116,5 @@ def fallback_directions(origin: dict, destination: dict) -> dict:
             },
         ],
     }
+
 

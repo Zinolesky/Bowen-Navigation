@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { login as apiLogin, setAccessToken } from "./api";
+import { login as apiLogin, setAccessToken, setOnUnauthorized, setRefreshToken } from "./api";
 import type { User } from "./types";
 
 type AuthContextValue = {
@@ -23,22 +23,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | undefined>();
   const [accessToken, setAccessTokenState] = useState<string | undefined>();
 
+  const signOut = useCallback(async () => {
+    setAccessToken(undefined);
+    setRefreshToken(undefined);
+    setAccessTokenState(undefined);
+    setUser(undefined);
+    await Promise.all([
+      SecureStore.deleteItemAsync(ACCESS_KEY),
+      SecureStore.deleteItemAsync(REFRESH_KEY),
+      SecureStore.deleteItemAsync(USER_KEY)
+    ]);
+  }, []);
+
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      signOut();
+    });
+    return () => setOnUnauthorized(undefined);
+  }, [signOut]);
+
   useEffect(() => {
     async function hydrate() {
-      const [storedAccess, storedUser] = await Promise.all([
-        SecureStore.getItemAsync(ACCESS_KEY),
-        SecureStore.getItemAsync(USER_KEY)
-      ]);
-      if (storedAccess && storedUser) {
-        setAccessToken(storedAccess);
-        setAccessTokenState(storedAccess);
-        setUser(JSON.parse(storedUser));
+      try {
+        const [storedAccess, storedRefresh, storedUser] = await Promise.all([
+          SecureStore.getItemAsync(ACCESS_KEY),
+          SecureStore.getItemAsync(REFRESH_KEY),
+          SecureStore.getItemAsync(USER_KEY)
+        ]);
+        if (storedAccess && storedUser) {
+          setAccessToken(storedAccess);
+          setRefreshToken(storedRefresh || undefined);
+          setAccessTokenState(storedAccess);
+          setUser(JSON.parse(storedUser));
+        }
+      } catch {
+        await signOut();
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
 
     hydrate();
-  }, []);
+  }, [signOut]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -48,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async signIn(fullName, matricNumber) {
         const result = await apiLogin(fullName, matricNumber);
         setAccessToken(result.access);
+        setRefreshToken(result.refresh);
         setAccessTokenState(result.access);
         setUser(result.user);
         await Promise.all([
@@ -56,18 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           SecureStore.setItemAsync(USER_KEY, JSON.stringify(result.user))
         ]);
       },
-      async signOut() {
-        setAccessToken(undefined);
-        setAccessTokenState(undefined);
-        setUser(undefined);
-        await Promise.all([
-          SecureStore.deleteItemAsync(ACCESS_KEY),
-          SecureStore.deleteItemAsync(REFRESH_KEY),
-          SecureStore.deleteItemAsync(USER_KEY)
-        ]);
-      }
+      signOut
     }),
-    [accessToken, isLoading, user]
+    [accessToken, isLoading, signOut, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -80,4 +98,3 @@ export function useAuth() {
   }
   return context;
 }
-

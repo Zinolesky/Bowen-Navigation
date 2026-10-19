@@ -52,63 +52,269 @@
   "buildings": [
     {
       "name": "Main Gate",
-      "description": "Primary public entrance into Bowen University, Iwo.",
-      "latitude": 7.6218,
-      "longitude": 4.18733
+      "description": "Primary entrance (Main Gate 1) into Bowen University, Iwo.",
+      "latitude": 7.621044,
+      "longitude": 4.190647,
+      "google_place_id": "ChIJ7bWkyBvbORAREnIUukJGx20"
     },
     {
       "name": "Senate Building",
-      "description": "Central administrative building for university leadership and records.",
-      "latitude": 7.6245,
-      "longitude": 4.18865
+      "description": "Central administrative building for university leadership, registry, and records.",
+      "latitude": 7.621734,
+      "longitude": 4.200695,
+      "google_place_id": ""
     },
     {
       "name": "Timothy Olagbenro Library",
-      "description": "Main university library and academic research facility.",
-      "latitude": 7.62408,
-      "longitude": 4.18918
+      "description": "Main university library, reading rooms, and academic research facility.",
+      "latitude": 7.619015,
+      "longitude": 4.201065,
+      "google_place_id": "ChIJIaDlxOXaORAR1PnY91R6oBk"
     },
     {
       "name": "Bowen Worship Centre",
-      "description": "Main chapel and worship centre on campus.",
-      "latitude": 7.62295,
-      "longitude": 4.19003
+      "description": "Main university chapel and worship centre on campus.",
+      "latitude": 7.62016,
+      "longitude": 4.202449,
+      "google_place_id": "ChIJlZD5iOXaORARqPJOnWvZDaU"
     },
     {
       "name": "College of Computing and Communication Studies",
-      "description": "Academic area for computing, communication, and related programmes.",
-      "latitude": 7.6251,
-      "longitude": 4.19035
+      "description": "Academic complex for Computer Science, Software Engineering, Cyber Security, and Communication programmes.",
+      "latitude": 7.621494,
+      "longitude": 4.204087,
+      "google_place_id": "ChIJQ2ZZWIvbORARK8wdTx9lRB4"
     },
     {
       "name": "College of Law",
-      "description": "Academic facility for law lectures and college administration.",
-      "latitude": 7.62575,
-      "longitude": 4.18798
+      "description": "Bowen Faculty of Law lecture theatres, moot court, and law library.",
+      "latitude": 7.621045,
+      "longitude": 4.205546,
+      "google_place_id": "ChIJzwTbVu7aORAR72uwXMWWSMQ"
     },
     {
       "name": "University Health Centre",
-      "description": "Student and staff health support facility.",
-      "latitude": 7.62235,
-      "longitude": 4.1884
+      "description": "College of Health Sciences and student/staff medical support facility.",
+      "latitude": 7.618532,
+      "longitude": 4.207186,
+      "google_place_id": "ChIJM7gMru7aORARAAHo0n8aA6k"
     },
     {
-      "name": "Jubilee Cafeteria",
-      "description": "Campus cafeteria and student dining area.",
-      "latitude": 7.62325,
-      "longitude": 4.18943
+      "name": "BUPAF Cafeteria",
+      "description": "Main campus cafeteria and student dining facility.",
+      "latitude": 7.625865,
+      "longitude": 4.192336,
+      "google_place_id": "ChIJkyenggLbORARbwGBMPVVDHA"
     },
     {
       "name": "288 Smart Hostel",
-      "description": "Residential hostel used in the project navigation demonstration.",
-      "latitude": 7.62192,
-      "longitude": 4.19096
+      "description": "Bowen Smart Hostel residential complex in the eastern campus zone.",
+      "latitude": 7.617407,
+      "longitude": 4.206585,
+      "google_place_id": "ChIJcbliN2LbORARK8xDavTEP_4"
     },
     {
       "name": "Sports Complex",
-      "description": "Outdoor recreation and sports area.",
-      "latitude": 7.62535,
-      "longitude": 4.18692
+      "description": "Main campus football pitch, track, and outdoor recreation complex.",
+      "latitude": 7.624666,
+      "longitude": 4.192515,
+      "google_place_id": "ChIJzd8eWf3aORARqGQM-MEtzAA"
+    },
+    {
+      "name": "Chris Alabi Lecture Theatre",
+      "description": "Major lecture theatre in the central academic core.",
+      "latitude": 7.621621,
+      "longitude": 4.202134,
+      "google_place_id": "ChIJMetyZeXaORARLYGFI2otKb4"
+    },
+    {
+      "name": "College of Social and Management Sciences",
+      "description": "Academic building and lecture halls for Social and Management Sciences.",
+      "latitude": 7.621409,
+      "longitude": 4.202316,
+      "google_place_id": ""
+    },
+    {
+      "name": "Bowen University Digital Center",
+      "description": "ICT, CBT examination centre, and digital innovation hub.",
+      "latitude": 7.62543,
+      "longitude": 4.191461,
+      "google_place_id": "ChIJGw_KlgLbORARlI0lC489WGw"
+    },
+    {
+      "name": "Olaosebikan Lecture Hall",
+      "description": "Academic lecture hall near the western campus core.",
+      "latitude": 7.623812,
+      "longitude": 4.192489,
+      "google_place_id": "ChIJwS4hVf3aORAR51Yu_Cbf6Y0"
+    },
+    {
+      "name": "New Horizon",
+      "description": "IT certification and practical computing centre along the main campus road.",
+      "latitude": 7.622064,
+      "longitude": 4.196062,
+      "google_place_id": ""
+    },
+    {
+      "name": "Sadler Female Hostel",
+      "description": "Female student residential hostel in the western campus zone.",
+      "latitude": 7.624089,
+      "longitude": 4.193036,
+      "google_place_id": "ChIJ85gJTv3aORARWqe72fWzhwM"
+    },
+    {
+      "name": "Mark Hall",
+      "description": "Male student residential hall in the northern hostel zone.",
+      "latitude": 7.623832,
+      "longitude": 4.203938,
+      "google_place_id": "ChIJ2UcbIvDaORARZ_Lt_NE7ADg"
+    },
+    {
+      "name": "Luke Hall",
+      "description": "Student residential hall adjacent to Mark and John Halls.",
+      "latitude": 7.623735,
+      "longitude": 4.20482,
+      "google_place_id": ""
+    },
+    {
+      "name": "Gamaliel Onosode Hall",
+      "description": "Student residential hostel at the northeastern end of campus.",
+      "latitude": 7.624078,
+      "longitude": 4.206412,
+      "google_place_id": ""
+    },
+    {
+      "name": "Blessed Cafe",
+      "description": "Popular student cafeteria and food spot near the eastern hostels and colleges.",
+      "latitude": 7.622837,
+      "longitude": 4.205304,
+      "google_place_id": "ChIJcxb2Mu7aORARl1OnLNsCwzo"
+    },
+    {
+      "name": "Christoy Cafe",
+      "description": "Student dining and refreshment centre south of the library and chapel.",
+      "latitude": 7.618037,
+      "longitude": 4.202415,
+      "google_place_id": "ChIJg5-HLRfbORARnLPti3nRWC8"
+    },
+    {
+      "name": "Faculty of Agriculture",
+      "description": "College of Agriculture, Engineering and Science building in the eastern academic zone.",
+      "latitude": 7.622241,
+      "longitude": 4.20668,
+      "google_place_id": ""
+    },
+    {
+      "name": "Department of Chemistry",
+      "description": "Department of Chemistry and Industrial Chemistry laboratories and offices.",
+      "latitude": 7.622191,
+      "longitude": 4.203785,
+      "google_place_id": ""
+    },
+    {
+      "name": "Department of Political Science",
+      "description": "Department of Political Science and Diplomatic Studies in the central academic core.",
+      "latitude": 7.621372,
+      "longitude": 4.201822,
+      "google_place_id": ""
+    },
+    {
+      "name": "SMS Lecture Halls",
+      "description": "Social and Management Sciences lecture halls and classrooms.",
+      "latitude": 7.621516,
+      "longitude": 4.202766,
+      "google_place_id": ""
+    },
+    {
+      "name": "Physiology Department",
+      "description": "Department of Physiology in the College of Health Sciences precinct.",
+      "latitude": 7.618885,
+      "longitude": 4.207208,
+      "google_place_id": ""
+    },
+    {
+      "name": "Bowen Radio 101.9 FM",
+      "description": "Campus broadcasting station and media studio.",
+      "latitude": 7.621446,
+      "longitude": 4.203167,
+      "google_place_id": ""
+    },
+    {
+      "name": "Bowen Guest House",
+      "description": "University hospitality and guest lodging along the main campus avenue.",
+      "latitude": 7.62154,
+      "longitude": 4.198234,
+      "google_place_id": ""
+    },
+    {
+      "name": "Matthew Hall",
+      "description": "Male student residential hall in the northern hostel zone.",
+      "latitude": 7.623584,
+      "longitude": 4.203987,
+      "google_place_id": ""
+    },
+    {
+      "name": "John Hall",
+      "description": "Male student residential hall next to Luke Hall.",
+      "latitude": 7.624147,
+      "longitude": 4.204762,
+      "google_place_id": ""
+    },
+    {
+      "name": "UPE 1 Hostel",
+      "description": "Student residential hostel in the western campus zone.",
+      "latitude": 7.623265,
+      "longitude": 4.192443,
+      "google_place_id": ""
+    },
+    {
+      "name": "UPE 2 Hostel",
+      "description": "Student residential hostel adjacent to UPE 1 and UPE 3.",
+      "latitude": 7.622754,
+      "longitude": 4.192132,
+      "google_place_id": ""
+    },
+    {
+      "name": "UPE 3 Hostel",
+      "description": "Student residential hostel near the western campus entrance.",
+      "latitude": 7.622281,
+      "longitude": 4.192003,
+      "google_place_id": ""
+    },
+    {
+      "name": "BUWA Cafeteria",
+      "description": "Bowen University Women Association cafeteria and dining hall.",
+      "latitude": 7.622499,
+      "longitude": 4.205511,
+      "google_place_id": ""
+    },
+    {
+      "name": "Y2K Cafe",
+      "description": "Student cafeteria and restaurant near BUWA and Blessed Cafe.",
+      "latitude": 7.622592,
+      "longitude": 4.205385,
+      "google_place_id": ""
+    },
+    {
+      "name": "BBSF Cafe",
+      "description": "Campus cafe and refreshment spot near Tito Gate.",
+      "latitude": 7.619509,
+      "longitude": 4.206047,
+      "google_place_id": ""
+    },
+    {
+      "name": "Tito Gate",
+      "description": "Eastern campus pedestrian and vehicular access gate.",
+      "latitude": 7.619644,
+      "longitude": 4.205862,
+      "google_place_id": ""
+    },
+    {
+      "name": "Walking Park",
+      "description": "Landscaped campus relaxation park east of the library and chapel.",
+      "latitude": 7.619117,
+      "longitude": 4.203534,
+      "google_place_id": ""
     }
   ],
   "pois": [
@@ -116,118 +322,1905 @@
       "name": "Main Gate",
       "category": "Transport",
       "building": "Main Gate",
-      "description": "Start point for many visitor and student navigation journeys.",
+      "description": "Primary entrance (Main Gate 1) into Bowen University, Iwo.",
       "operating_hours": "Open daily",
-      "icon_identifier": "navigation"
+      "icon_identifier": "navigation",
+      "google_place_id": "ChIJ7bWkyBvbORAREnIUukJGx20"
     },
     {
       "name": "Senate Building",
       "category": "Administrative",
       "building": "Senate Building",
-      "description": "Administrative destination for records, approvals, and official enquiries.",
+      "description": "Central administrative building for university leadership, registry, and records.",
       "operating_hours": "Mon-Fri, 8:00 AM - 4:00 PM",
-      "icon_identifier": "briefcase"
+      "icon_identifier": "briefcase",
+      "google_place_id": ""
     },
     {
       "name": "Timothy Olagbenro Library",
       "category": "Academic",
       "building": "Timothy Olagbenro Library",
-      "description": "Library, reading rooms, and academic reference services.",
+      "description": "Main university library, reading rooms, and academic research facility.",
       "operating_hours": "Mon-Sat, 8:00 AM - 9:00 PM",
-      "icon_identifier": "book-open"
+      "icon_identifier": "book-open",
+      "google_place_id": "ChIJIaDlxOXaORAR1PnY91R6oBk"
     },
     {
       "name": "Bowen Worship Centre",
       "category": "Recreation",
       "building": "Bowen Worship Centre",
-      "description": "Main chapel and gathering point for worship and university events.",
+      "description": "Main university chapel and worship centre on campus.",
       "operating_hours": "Open for scheduled services",
-      "icon_identifier": "landmark"
+      "icon_identifier": "landmark",
+      "google_place_id": "ChIJlZD5iOXaORARqPJOnWvZDaU"
     },
     {
       "name": "College of Computing and Communication Studies",
       "category": "Academic",
       "building": "College of Computing and Communication Studies",
-      "description": "College offices, laboratories, and lecture areas for computing students.",
+      "description": "Academic complex for Computer Science, Software Engineering, Cyber Security, and Communication programmes.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
-      "icon_identifier": "school"
+      "icon_identifier": "school",
+      "google_place_id": "ChIJQ2ZZWIvbORARK8wdTx9lRB4"
     },
     {
       "name": "College of Law",
       "category": "Academic",
       "building": "College of Law",
-      "description": "Law faculty offices, lecture rooms, and student support points.",
+      "description": "Bowen Faculty of Law lecture theatres, moot court, and law library.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
-      "icon_identifier": "scale"
+      "icon_identifier": "scale",
+      "google_place_id": "ChIJzwTbVu7aORAR72uwXMWWSMQ"
     },
     {
       "name": "University Health Centre",
       "category": "Health",
       "building": "University Health Centre",
-      "description": "Medical support, first aid, and health consultation point.",
+      "description": "College of Health Sciences and student/staff medical support facility.",
       "operating_hours": "24 hours",
-      "icon_identifier": "heart-pulse"
+      "icon_identifier": "heart-pulse",
+      "google_place_id": "ChIJM7gMru7aORARAAHo0n8aA6k"
     },
     {
-      "name": "Jubilee Cafeteria",
+      "name": "BUPAF Cafeteria",
       "category": "Recreation",
-      "building": "Jubilee Cafeteria",
-      "description": "Food service and student dining area.",
+      "building": "BUPAF Cafeteria",
+      "description": "Main campus cafeteria and student dining facility.",
       "operating_hours": "Mon-Sat, 7:00 AM - 8:00 PM",
-      "icon_identifier": "utensils"
+      "icon_identifier": "utensils",
+      "google_place_id": "ChIJkyenggLbORARbwGBMPVVDHA"
     },
     {
       "name": "288 Smart Hostel",
       "category": "Residential",
       "building": "288 Smart Hostel",
-      "description": "Student residential hostel and navigation test destination.",
+      "description": "Bowen Smart Hostel residential complex in the eastern campus zone.",
       "operating_hours": "Residents only",
-      "icon_identifier": "home"
+      "icon_identifier": "home",
+      "google_place_id": "ChIJcbliN2LbORARK8xDavTEP_4"
     },
     {
       "name": "Sports Complex",
       "category": "Recreation",
       "building": "Sports Complex",
-      "description": "Outdoor sports and recreation destination.",
+      "description": "Main campus football pitch, track, and outdoor recreation complex.",
       "operating_hours": "Daily, 6:00 AM - 7:00 PM",
-      "icon_identifier": "dumbbell"
+      "icon_identifier": "dumbbell",
+      "google_place_id": "ChIJzd8eWf3aORARqGQM-MEtzAA"
+    },
+    {
+      "name": "Chris Alabi Lecture Theatre",
+      "category": "Academic",
+      "building": "Chris Alabi Lecture Theatre",
+      "description": "Major lecture theatre in the central academic core.",
+      "operating_hours": "Mon-Sat, 8:00 AM - 6:00 PM",
+      "icon_identifier": "graduation-cap",
+      "google_place_id": "ChIJMetyZeXaORARLYGFI2otKb4"
+    },
+    {
+      "name": "College of Social and Management Sciences",
+      "category": "Academic",
+      "building": "College of Social and Management Sciences",
+      "description": "Academic building and lecture halls for Social and Management Sciences.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "school",
+      "google_place_id": ""
+    },
+    {
+      "name": "Bowen University Digital Center",
+      "category": "Academic",
+      "building": "Bowen University Digital Center",
+      "description": "ICT, CBT examination centre, and digital innovation hub.",
+      "operating_hours": "Mon-Sat, 8:00 AM - 6:00 PM",
+      "icon_identifier": "school",
+      "google_place_id": "ChIJGw_KlgLbORARlI0lC489WGw"
+    },
+    {
+      "name": "Olaosebikan Lecture Hall",
+      "category": "Academic",
+      "building": "Olaosebikan Lecture Hall",
+      "description": "Academic lecture hall near the western campus core.",
+      "operating_hours": "Mon-Sat, 8:00 AM - 6:00 PM",
+      "icon_identifier": "graduation-cap",
+      "google_place_id": "ChIJwS4hVf3aORAR51Yu_Cbf6Y0"
+    },
+    {
+      "name": "New Horizon",
+      "category": "Academic",
+      "building": "New Horizon",
+      "description": "IT certification and practical computing centre along the main campus road.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "school",
+      "google_place_id": ""
+    },
+    {
+      "name": "Sadler Female Hostel",
+      "category": "Residential",
+      "building": "Sadler Female Hostel",
+      "description": "Female student residential hostel in the western campus zone.",
+      "operating_hours": "Residents only",
+      "icon_identifier": "home",
+      "google_place_id": "ChIJ85gJTv3aORARWqe72fWzhwM"
+    },
+    {
+      "name": "Mark Hall",
+      "category": "Residential",
+      "building": "Mark Hall",
+      "description": "Male student residential hall in the northern hostel zone.",
+      "operating_hours": "Residents only",
+      "icon_identifier": "home",
+      "google_place_id": "ChIJ2UcbIvDaORARZ_Lt_NE7ADg"
+    },
+    {
+      "name": "Luke Hall",
+      "category": "Residential",
+      "building": "Luke Hall",
+      "description": "Student residential hall adjacent to Mark and John Halls.",
+      "operating_hours": "Residents only",
+      "icon_identifier": "home",
+      "google_place_id": ""
+    },
+    {
+      "name": "Gamaliel Onosode Hall",
+      "category": "Residential",
+      "building": "Gamaliel Onosode Hall",
+      "description": "Student residential hostel at the northeastern end of campus.",
+      "operating_hours": "Residents only",
+      "icon_identifier": "home",
+      "google_place_id": ""
+    },
+    {
+      "name": "Blessed Cafe",
+      "category": "Recreation",
+      "building": "Blessed Cafe",
+      "description": "Popular student cafeteria and food spot near the eastern hostels and colleges.",
+      "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
+      "icon_identifier": "utensils",
+      "google_place_id": "ChIJcxb2Mu7aORARl1OnLNsCwzo"
+    },
+    {
+      "name": "Christoy Cafe",
+      "category": "Recreation",
+      "building": "Christoy Cafe",
+      "description": "Student dining and refreshment centre south of the library and chapel.",
+      "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
+      "icon_identifier": "utensils",
+      "google_place_id": "ChIJg5-HLRfbORARnLPti3nRWC8"
+    },
+    {
+      "name": "Faculty of Agriculture",
+      "category": "Academic",
+      "building": "Faculty of Agriculture",
+      "description": "College of Agriculture, Engineering and Science building in the eastern academic zone.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "graduation-cap",
+      "google_place_id": ""
+    },
+    {
+      "name": "Department of Chemistry",
+      "category": "Academic",
+      "building": "Department of Chemistry",
+      "description": "Department of Chemistry and Industrial Chemistry laboratories and offices.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "graduation-cap",
+      "google_place_id": ""
+    },
+    {
+      "name": "Department of Political Science",
+      "category": "Academic",
+      "building": "Department of Political Science",
+      "description": "Department of Political Science and Diplomatic Studies in the central academic core.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "graduation-cap",
+      "google_place_id": ""
+    },
+    {
+      "name": "SMS Lecture Halls",
+      "category": "Academic",
+      "building": "SMS Lecture Halls",
+      "description": "Social and Management Sciences lecture halls and classrooms.",
+      "operating_hours": "Mon-Sat, 8:00 AM - 6:00 PM",
+      "icon_identifier": "graduation-cap",
+      "google_place_id": ""
+    },
+    {
+      "name": "Physiology Department",
+      "category": "Academic",
+      "building": "Physiology Department",
+      "description": "Department of Physiology in the College of Health Sciences precinct.",
+      "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
+      "icon_identifier": "graduation-cap",
+      "google_place_id": ""
+    },
+    {
+      "name": "Bowen Radio 101.9 FM",
+      "category": "Administrative",
+      "building": "Bowen Radio 101.9 FM",
+      "description": "Campus broadcasting station and media studio.",
+      "operating_hours": "Daily, 6:00 AM - 10:00 PM",
+      "icon_identifier": "building-2",
+      "google_place_id": ""
+    },
+    {
+      "name": "Bowen Guest House",
+      "category": "Residential",
+      "building": "Bowen Guest House",
+      "description": "University hospitality and guest lodging along the main campus avenue.",
+      "operating_hours": "Open 24 Hours",
+      "icon_identifier": "bed",
+      "google_place_id": ""
+    },
+    {
+      "name": "Matthew Hall",
+      "category": "Residential",
+      "building": "Matthew Hall",
+      "description": "Male student residential hall in the northern hostel zone.",
+      "operating_hours": "Open daily",
+      "icon_identifier": "bed",
+      "google_place_id": ""
+    },
+    {
+      "name": "John Hall",
+      "category": "Residential",
+      "building": "John Hall",
+      "description": "Male student residential hall next to Luke Hall.",
+      "operating_hours": "Open daily",
+      "icon_identifier": "bed",
+      "google_place_id": ""
+    },
+    {
+      "name": "UPE 1 Hostel",
+      "category": "Residential",
+      "building": "UPE 1 Hostel",
+      "description": "Student residential hostel in the western campus zone.",
+      "operating_hours": "Open daily",
+      "icon_identifier": "bed",
+      "google_place_id": ""
+    },
+    {
+      "name": "UPE 2 Hostel",
+      "category": "Residential",
+      "building": "UPE 2 Hostel",
+      "description": "Student residential hostel adjacent to UPE 1 and UPE 3.",
+      "operating_hours": "Open daily",
+      "icon_identifier": "bed",
+      "google_place_id": ""
+    },
+    {
+      "name": "UPE 3 Hostel",
+      "category": "Residential",
+      "building": "UPE 3 Hostel",
+      "description": "Student residential hostel near the western campus entrance.",
+      "operating_hours": "Open daily",
+      "icon_identifier": "bed",
+      "google_place_id": ""
+    },
+    {
+      "name": "BUWA Cafeteria",
+      "category": "Recreation",
+      "building": "BUWA Cafeteria",
+      "description": "Bowen University Women Association cafeteria and dining hall.",
+      "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
+      "icon_identifier": "utensils",
+      "google_place_id": ""
+    },
+    {
+      "name": "Y2K Cafe",
+      "category": "Recreation",
+      "building": "Y2K Cafe",
+      "description": "Student cafeteria and restaurant near BUWA and Blessed Cafe.",
+      "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
+      "icon_identifier": "utensils",
+      "google_place_id": ""
+    },
+    {
+      "name": "BBSF Cafe",
+      "category": "Recreation",
+      "building": "BBSF Cafe",
+      "description": "Campus cafe and refreshment spot near Tito Gate.",
+      "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
+      "icon_identifier": "utensils",
+      "google_place_id": ""
+    },
+    {
+      "name": "Tito Gate",
+      "category": "Transport",
+      "building": "Tito Gate",
+      "description": "Eastern campus pedestrian and vehicular access gate.",
+      "operating_hours": "Daily, 6:00 AM - 10:00 PM",
+      "icon_identifier": "navigation",
+      "google_place_id": ""
+    },
+    {
+      "name": "Walking Park",
+      "category": "Recreation",
+      "building": "Walking Park",
+      "description": "Landscaped campus relaxation park east of the library and chapel.",
+      "operating_hours": "Open daily",
+      "icon_identifier": "trees",
+      "google_place_id": ""
     }
   ],
   "tracks": [
     {
-      "name": "Main Gate to Worship Centre",
-      "description": "Primary walking route from the campus entry area toward the chapel.",
-      "source": "seed",
+      "name": "Bowen Campus Main Road (Gate to Academic Core)",
+      "description": "Primary campus boulevard from Main Gate 1 past New Horizon to Senate Building.",
+      "track_type": "vehicle",
+      "source": "google-maps",
       "coordinates": [
-        [7.6218, 4.18733],
-        [7.62222, 4.18805],
-        [7.62252, 4.18902],
-        [7.62295, 4.19003]
+        [
+          7.62105,
+          4.19066
+        ],
+        [
+          7.62097,
+          4.19069
+        ],
+        [
+          7.62115,
+          4.191
+        ],
+        [
+          7.62134,
+          4.19134
+        ],
+        [
+          7.62154,
+          4.19172
+        ],
+        [
+          7.6217,
+          4.19208
+        ],
+        [
+          7.62182,
+          4.19239
+        ],
+        [
+          7.62192,
+          4.1927
+        ],
+        [
+          7.62193,
+          4.19274
+        ],
+        [
+          7.62197,
+          4.19289
+        ],
+        [
+          7.62203,
+          4.19312
+        ],
+        [
+          7.62205,
+          4.19324
+        ],
+        [
+          7.62206,
+          4.19334
+        ],
+        [
+          7.62207,
+          4.19345
+        ],
+        [
+          7.62208,
+          4.19371
+        ],
+        [
+          7.62209,
+          4.19393
+        ],
+        [
+          7.62208,
+          4.19404
+        ],
+        [
+          7.62206,
+          4.1942
+        ],
+        [
+          7.62204,
+          4.19445
+        ],
+        [
+          7.62202,
+          4.19465
+        ],
+        [
+          7.62198,
+          4.19484
+        ],
+        [
+          7.62192,
+          4.19506
+        ],
+        [
+          7.62188,
+          4.19518
+        ],
+        [
+          7.62185,
+          4.19527
+        ],
+        [
+          7.62181,
+          4.19535
+        ],
+        [
+          7.62176,
+          4.19548
+        ],
+        [
+          7.62157,
+          4.19586
+        ],
+        [
+          7.62147,
+          4.19604
+        ],
+        [
+          7.62141,
+          4.19616
+        ],
+        [
+          7.62136,
+          4.19625
+        ],
+        [
+          7.62128,
+          4.1964
+        ],
+        [
+          7.62118,
+          4.19659
+        ],
+        [
+          7.62116,
+          4.19664
+        ],
+        [
+          7.62107,
+          4.19679
+        ],
+        [
+          7.62099,
+          4.19696
+        ],
+        [
+          7.6209,
+          4.19712
+        ],
+        [
+          7.62084,
+          4.19726
+        ],
+        [
+          7.62072,
+          4.1975
+        ],
+        [
+          7.62062,
+          4.19774
+        ],
+        [
+          7.62053,
+          4.19797
+        ],
+        [
+          7.62046,
+          4.1983
+        ],
+        [
+          7.62043,
+          4.19844
+        ],
+        [
+          7.62041,
+          4.19864
+        ],
+        [
+          7.62039,
+          4.19876
+        ],
+        [
+          7.62039,
+          4.19888
+        ],
+        [
+          7.62031,
+          4.19979
+        ],
+        [
+          7.62026,
+          4.20025
+        ],
+        [
+          7.62036,
+          4.20024
+        ],
+        [
+          7.62075,
+          4.2002
+        ],
+        [
+          7.62116,
+          4.20017
+        ],
+        [
+          7.62159,
+          4.20013
+        ],
+        [
+          7.62208,
+          4.20009
+        ],
+        [
+          7.62212,
+          4.2001
+        ],
+        [
+          7.62216,
+          4.20011
+        ],
+        [
+          7.6222,
+          4.20014
+        ],
+        [
+          7.62221,
+          4.20016
+        ],
+        [
+          7.62223,
+          4.20018
+        ],
+        [
+          7.62225,
+          4.20023
+        ],
+        [
+          7.62229,
+          4.20039
+        ],
+        [
+          7.62236,
+          4.20072
+        ],
+        [
+          7.62241,
+          4.20101
+        ],
+        [
+          7.62188,
+          4.20118
+        ]
       ]
     },
     {
-      "name": "Academic Core Loop",
-      "description": "Walking path connecting the library, senate building, computing college, and law college.",
-      "source": "seed",
+      "name": "Western Campus & Sadler Hostel Drive",
+      "description": "Campus road serving UPE halls, Olaosebikan Lecture Hall, Sadler Female Hostel, Sports Complex, and BUPAF.",
+      "track_type": "vehicle",
+      "source": "google-maps",
       "coordinates": [
-        [7.62408, 4.18918],
-        [7.6245, 4.18865],
-        [7.6251, 4.19035],
-        [7.62575, 4.18798],
-        [7.62408, 4.18918]
+        [
+          7.62105,
+          4.19066
+        ],
+        [
+          7.62097,
+          4.19069
+        ],
+        [
+          7.62115,
+          4.191
+        ],
+        [
+          7.62134,
+          4.19134
+        ],
+        [
+          7.62154,
+          4.19172
+        ],
+        [
+          7.6217,
+          4.19208
+        ],
+        [
+          7.62182,
+          4.19239
+        ],
+        [
+          7.62192,
+          4.1927
+        ],
+        [
+          7.62193,
+          4.19274
+        ],
+        [
+          7.62197,
+          4.19289
+        ],
+        [
+          7.62203,
+          4.19312
+        ],
+        [
+          7.62205,
+          4.19324
+        ],
+        [
+          7.62206,
+          4.19334
+        ],
+        [
+          7.62207,
+          4.19345
+        ],
+        [
+          7.62208,
+          4.19371
+        ],
+        [
+          7.62209,
+          4.19393
+        ],
+        [
+          7.62218,
+          4.19395
+        ],
+        [
+          7.62296,
+          4.19398
+        ],
+        [
+          7.6231,
+          4.19399
+        ],
+        [
+          7.6235,
+          4.194
+        ],
+        [
+          7.62417,
+          4.19402
+        ],
+        [
+          7.62422,
+          4.19402
+        ],
+        [
+          7.62439,
+          4.19402
+        ],
+        [
+          7.62476,
+          4.19403
+        ],
+        [
+          7.62511,
+          4.194
+        ],
+        [
+          7.62513,
+          4.19395
+        ],
+        [
+          7.62513,
+          4.19386
+        ],
+        [
+          7.62511,
+          4.19362
+        ],
+        [
+          7.62511,
+          4.19312
+        ],
+        [
+          7.62511,
+          4.19309
+        ],
+        [
+          7.62518,
+          4.19302
+        ],
+        [
+          7.62524,
+          4.19296
+        ],
+        [
+          7.62532,
+          4.19289
+        ],
+        [
+          7.62539,
+          4.19279
+        ],
+        [
+          7.62543,
+          4.1927
+        ],
+        [
+          7.62545,
+          4.19261
+        ],
+        [
+          7.62546,
+          4.19248
+        ],
+        [
+          7.62545,
+          4.19241
+        ],
+        [
+          7.62545,
+          4.19237
+        ]
       ]
     },
     {
-      "name": "Hostel and Health Route",
-      "description": "Walking route from student hostel area toward health and cafeteria facilities.",
-      "source": "seed",
+      "name": "Digital Center & Performing Arts Access",
+      "description": "Access road to Bowen Digital Center and Performing Arts Theatre.",
+      "track_type": "both",
+      "source": "google-maps",
       "coordinates": [
-        [7.62192, 4.19096],
-        [7.62235, 4.1884],
-        [7.62325, 4.18943],
-        [7.62408, 4.18918]
+        [
+          7.62392,
+          4.19248
+        ],
+        [
+          7.62392,
+          4.19244
+        ],
+        [
+          7.62392,
+          4.19242
+        ],
+        [
+          7.62392,
+          4.19227
+        ],
+        [
+          7.62394,
+          4.19218
+        ],
+        [
+          7.62396,
+          4.1921
+        ],
+        [
+          7.624,
+          4.19202
+        ],
+        [
+          7.62409,
+          4.19189
+        ],
+        [
+          7.62417,
+          4.19177
+        ],
+        [
+          7.6242,
+          4.19171
+        ],
+        [
+          7.62422,
+          4.19165
+        ],
+        [
+          7.62423,
+          4.1916
+        ],
+        [
+          7.62422,
+          4.19127
+        ],
+        [
+          7.62464,
+          4.19124
+        ],
+        [
+          7.62486,
+          4.19122
+        ],
+        [
+          7.62501,
+          4.1912
+        ],
+        [
+          7.62512,
+          4.19119
+        ],
+        [
+          7.62539,
+          4.19128
+        ],
+        [
+          7.62547,
+          4.1913
+        ]
+      ]
+    },
+    {
+      "name": "Senate to Library & Chapel Road",
+      "description": "Campus road linking Senate Building to Timothy Olagbenro Library.",
+      "track_type": "vehicle",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.62189,
+          4.20118
+        ],
+        [
+          7.62241,
+          4.20101
+        ],
+        [
+          7.62236,
+          4.20072
+        ],
+        [
+          7.62229,
+          4.20039
+        ],
+        [
+          7.62225,
+          4.20023
+        ],
+        [
+          7.62223,
+          4.20018
+        ],
+        [
+          7.62221,
+          4.20016
+        ],
+        [
+          7.6222,
+          4.20014
+        ],
+        [
+          7.62216,
+          4.20011
+        ],
+        [
+          7.62212,
+          4.2001
+        ],
+        [
+          7.62208,
+          4.20009
+        ],
+        [
+          7.62159,
+          4.20013
+        ],
+        [
+          7.62116,
+          4.20017
+        ],
+        [
+          7.62075,
+          4.2002
+        ],
+        [
+          7.62036,
+          4.20024
+        ],
+        [
+          7.62026,
+          4.20025
+        ],
+        [
+          7.62001,
+          4.20026
+        ],
+        [
+          7.61954,
+          4.2003
+        ],
+        [
+          7.61955,
+          4.20035
+        ],
+        [
+          7.61955,
+          4.20041
+        ],
+        [
+          7.61951,
+          4.2009
+        ],
+        [
+          7.6195,
+          4.20103
+        ],
+        [
+          7.61949,
+          4.20108
+        ],
+        [
+          7.61948,
+          4.20114
+        ]
+      ]
+    },
+    {
+      "name": "Library Entrance Driveway",
+      "description": "Short entrance spur connecting the main road to Timothy Olagbenro Library.",
+      "track_type": "both",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.61949,
+          4.20108
+        ],
+        [
+          7.61918,
+          4.20108
+        ]
+      ]
+    },
+    {
+      "name": "Library to Worship Centre & Computing Road",
+      "description": "Campus road from Library past Bowen Worship Centre to College of Computing.",
+      "track_type": "both",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.61948,
+          4.20114
+        ],
+        [
+          7.61947,
+          4.20129
+        ],
+        [
+          7.61944,
+          4.20156
+        ],
+        [
+          7.61943,
+          4.20174
+        ],
+        [
+          7.61942,
+          4.20184
+        ],
+        [
+          7.61941,
+          4.20195
+        ],
+        [
+          7.61936,
+          4.20247
+        ],
+        [
+          7.61932,
+          4.20289
+        ],
+        [
+          7.61929,
+          4.2031
+        ],
+        [
+          7.61929,
+          4.20312
+        ],
+        [
+          7.61929,
+          4.20313
+        ],
+        [
+          7.61928,
+          4.20314
+        ],
+        [
+          7.61929,
+          4.20314
+        ],
+        [
+          7.61932,
+          4.20314
+        ],
+        [
+          7.61966,
+          4.20316
+        ],
+        [
+          7.61989,
+          4.20318
+        ],
+        [
+          7.61994,
+          4.20319
+        ],
+        [
+          7.62001,
+          4.2032
+        ],
+        [
+          7.62003,
+          4.2032
+        ],
+        [
+          7.62008,
+          4.20321
+        ],
+        [
+          7.62012,
+          4.20321
+        ],
+        [
+          7.62051,
+          4.20324
+        ],
+        [
+          7.62068,
+          4.20325
+        ],
+        [
+          7.62073,
+          4.20324
+        ],
+        [
+          7.62077,
+          4.20325
+        ],
+        [
+          7.6208,
+          4.20325
+        ],
+        [
+          7.6208,
+          4.2033
+        ],
+        [
+          7.6208,
+          4.20334
+        ],
+        [
+          7.6208,
+          4.20335
+        ],
+        [
+          7.6208,
+          4.20343
+        ],
+        [
+          7.62079,
+          4.20348
+        ],
+        [
+          7.62075,
+          4.20394
+        ],
+        [
+          7.62073,
+          4.20407
+        ],
+        [
+          7.62072,
+          4.20412
+        ],
+        [
+          7.62111,
+          4.20436
+        ],
+        [
+          7.62152,
+          4.20431
+        ]
+      ]
+    },
+    {
+      "name": "Northern Hostel Road (Senate to Mark & Onosode Halls)",
+      "description": "Road from Academic Core north to Mark Hall, Matthew Hall, Luke Hall, John Hall, and Gamaliel Onosode Hall.",
+      "track_type": "vehicle",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.62188,
+          4.20118
+        ],
+        [
+          7.62241,
+          4.20101
+        ],
+        [
+          7.62241,
+          4.20104
+        ],
+        [
+          7.62248,
+          4.20135
+        ],
+        [
+          7.62249,
+          4.20143
+        ],
+        [
+          7.62255,
+          4.20175
+        ],
+        [
+          7.62263,
+          4.20215
+        ],
+        [
+          7.6227,
+          4.20252
+        ],
+        [
+          7.62296,
+          4.20387
+        ],
+        [
+          7.62313,
+          4.20477
+        ],
+        [
+          7.62337,
+          4.20586
+        ],
+        [
+          7.62339,
+          4.20595
+        ],
+        [
+          7.6234,
+          4.206
+        ],
+        [
+          7.62341,
+          4.20605
+        ],
+        [
+          7.62343,
+          4.20614
+        ],
+        [
+          7.62343,
+          4.20616
+        ],
+        [
+          7.62344,
+          4.2062
+        ],
+        [
+          7.62344,
+          4.20625
+        ],
+        [
+          7.62349,
+          4.20651
+        ]
+      ]
+    },
+    {
+      "name": "Eastern Campus Road (Computing to Law & Health Sciences)",
+      "description": "Road connecting College of Computing, Faculty of Law, Tito Gate, and College of Health Sciences.",
+      "track_type": "vehicle",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.62152,
+          4.20431
+        ],
+        [
+          7.62111,
+          4.20436
+        ],
+        [
+          7.62072,
+          4.20412
+        ],
+        [
+          7.62065,
+          4.20477
+        ],
+        [
+          7.62064,
+          4.20484
+        ],
+        [
+          7.62058,
+          4.20531
+        ],
+        [
+          7.61971,
+          4.20547
+        ],
+        [
+          7.61864,
+          4.20566
+        ],
+        [
+          7.61861,
+          4.20656
+        ],
+        [
+          7.61863,
+          4.20697
+        ],
+        [
+          7.61854,
+          4.20702
+        ],
+        [
+          7.61852,
+          4.20702
+        ]
+      ]
+    },
+    {
+      "name": "Smart Hostel Access Road",
+      "description": "Access road from Tito Gate to 288 Smart Hostel and College of Health Sciences.",
+      "track_type": "both",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.61958,
+          4.20549
+        ],
+        [
+          7.61864,
+          4.20566
+        ],
+        [
+          7.61861,
+          4.20656
+        ],
+        [
+          7.61863,
+          4.20697
+        ],
+        [
+          7.61854,
+          4.20702
+        ],
+        [
+          7.61844,
+          4.20702
+        ],
+        [
+          7.61804,
+          4.20698
+        ],
+        [
+          7.6179,
+          4.20702
+        ],
+        [
+          7.61781,
+          4.2071
+        ],
+        [
+          7.61759,
+          4.20743
+        ],
+        [
+          7.61758,
+          4.20743
+        ],
+        [
+          7.61732,
+          4.20724
+        ],
+        [
+          7.61725,
+          4.20713
+        ],
+        [
+          7.6171,
+          4.20707
+        ],
+        [
+          7.61702,
+          4.20699
+        ],
+        [
+          7.61693,
+          4.20682
+        ]
+      ]
+    },
+    {
+      "name": "Blessed Cafe & Male Hostels Connector",
+      "description": "Road connecting Computing College and Law Faculty north past Blessed Cafe to the male hostels.",
+      "track_type": "both",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.62152,
+          4.20431
+        ],
+        [
+          7.62111,
+          4.20436
+        ],
+        [
+          7.62072,
+          4.20412
+        ],
+        [
+          7.62065,
+          4.20477
+        ],
+        [
+          7.62064,
+          4.20484
+        ],
+        [
+          7.62058,
+          4.20531
+        ],
+        [
+          7.62164,
+          4.20508
+        ],
+        [
+          7.62199,
+          4.20501
+        ],
+        [
+          7.62313,
+          4.20477
+        ],
+        [
+          7.62317,
+          4.20494
+        ]
+      ]
+    },
+    {
+      "name": "Christoy Cafe Southern Loop",
+      "description": "Access road and walkway from the Library-Chapel main road south to Christoy Cafe.",
+      "track_type": "both",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.61936,
+          4.20247
+        ],
+        [
+          7.61928,
+          4.20247
+        ],
+        [
+          7.61924,
+          4.20249
+        ],
+        [
+          7.61918,
+          4.2025
+        ],
+        [
+          7.61913,
+          4.20251
+        ],
+        [
+          7.61908,
+          4.20251
+        ],
+        [
+          7.61901,
+          4.20253
+        ],
+        [
+          7.61895,
+          4.20252
+        ],
+        [
+          7.61888,
+          4.20253
+        ],
+        [
+          7.61878,
+          4.20253
+        ],
+        [
+          7.61868,
+          4.20253
+        ],
+        [
+          7.6186,
+          4.20254
+        ],
+        [
+          7.6185,
+          4.20255
+        ],
+        [
+          7.61838,
+          4.20256
+        ],
+        [
+          7.61829,
+          4.20258
+        ],
+        [
+          7.61829,
+          4.20252
+        ],
+        [
+          7.6183,
+          4.20246
+        ]
+      ]
+    },
+    {
+      "name": "Southern Library to Christoy Cafe Road",
+      "description": "Southern campus road wrapping around the south side of Timothy Olagbenro Library to Christoy Cafe.",
+      "track_type": "both",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.61954,
+          4.2003
+        ],
+        [
+          7.61951,
+          4.2003
+        ],
+        [
+          7.61934,
+          4.20032
+        ],
+        [
+          7.61899,
+          4.20036
+        ],
+        [
+          7.61887,
+          4.20037
+        ],
+        [
+          7.61862,
+          4.20039
+        ],
+        [
+          7.61844,
+          4.20041
+        ],
+        [
+          7.61843,
+          4.20055
+        ],
+        [
+          7.6184,
+          4.201
+        ],
+        [
+          7.61835,
+          4.20172
+        ],
+        [
+          7.61833,
+          4.20193
+        ],
+        [
+          7.61832,
+          4.20213
+        ],
+        [
+          7.61831,
+          4.20229
+        ],
+        [
+          7.6183,
+          4.20246
+        ]
+      ]
+    },
+    {
+      "name": "Academic Core Pedestrian Spine (Senate - Alabi - SMS - Computing)",
+      "description": "Central pedestrian walkway linking Senate Building, Chris Alabi Lecture Theatre, SMS College, and Computing.",
+      "track_type": "pedestrian",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.62188,
+          4.20118
+        ],
+        [
+          7.62241,
+          4.20101
+        ],
+        [
+          7.62236,
+          4.20072
+        ],
+        [
+          7.62229,
+          4.20039
+        ],
+        [
+          7.62225,
+          4.20023
+        ],
+        [
+          7.62223,
+          4.20018
+        ],
+        [
+          7.62221,
+          4.20016
+        ],
+        [
+          7.6222,
+          4.20014
+        ],
+        [
+          7.62216,
+          4.20011
+        ],
+        [
+          7.62212,
+          4.2001
+        ],
+        [
+          7.62208,
+          4.20009
+        ],
+        [
+          7.62159,
+          4.20013
+        ],
+        [
+          7.62116,
+          4.20017
+        ],
+        [
+          7.62114,
+          4.20023
+        ],
+        [
+          7.62112,
+          4.20034
+        ],
+        [
+          7.62111,
+          4.20048
+        ],
+        [
+          7.62109,
+          4.20059
+        ],
+        [
+          7.62107,
+          4.20074
+        ],
+        [
+          7.62105,
+          4.20096
+        ],
+        [
+          7.62104,
+          4.20108
+        ],
+        [
+          7.62102,
+          4.20129
+        ],
+        [
+          7.62101,
+          4.20136
+        ],
+        [
+          7.62101,
+          4.2014
+        ],
+        [
+          7.62101,
+          4.20147
+        ],
+        [
+          7.621,
+          4.20154
+        ],
+        [
+          7.62099,
+          4.20162
+        ],
+        [
+          7.62098,
+          4.20169
+        ],
+        [
+          7.62096,
+          4.2018
+        ],
+        [
+          7.62095,
+          4.20197
+        ],
+        [
+          7.62094,
+          4.20202
+        ],
+        [
+          7.62092,
+          4.20216
+        ],
+        [
+          7.62088,
+          4.20275
+        ],
+        [
+          7.62087,
+          4.20284
+        ],
+        [
+          7.62081,
+          4.20322
+        ],
+        [
+          7.6208,
+          4.20325
+        ],
+        [
+          7.6208,
+          4.2033
+        ],
+        [
+          7.6208,
+          4.20335
+        ],
+        [
+          7.6208,
+          4.20343
+        ],
+        [
+          7.62095,
+          4.20346
+        ],
+        [
+          7.62112,
+          4.20361
+        ],
+        [
+          7.62126,
+          4.20368
+        ],
+        [
+          7.62143,
+          4.20376
+        ],
+        [
+          7.62162,
+          4.20389
+        ]
+      ]
+    },
+    {
+      "name": "Chapel to Academic Core Walkway",
+      "description": "Pedestrian footpath directly connecting Bowen Worship Centre to Chris Alabi Lecture Theatre and Senate.",
+      "track_type": "pedestrian",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.62012,
+          4.20321
+        ],
+        [
+          7.62051,
+          4.20324
+        ],
+        [
+          7.62068,
+          4.20325
+        ],
+        [
+          7.62073,
+          4.20324
+        ],
+        [
+          7.62077,
+          4.20325
+        ],
+        [
+          7.6208,
+          4.20325
+        ],
+        [
+          7.6208,
+          4.2033
+        ],
+        [
+          7.6208,
+          4.20334
+        ],
+        [
+          7.62196,
+          4.20315
+        ],
+        [
+          7.62207,
+          4.2031
+        ],
+        [
+          7.62207,
+          4.20305
+        ],
+        [
+          7.62158,
+          4.20226
+        ]
+      ]
+    },
+    {
+      "name": "Chapel to Tito Gate Pedestrian Path",
+      "description": "Pedestrian walkway from Bowen Worship Centre east toward Tito Gate and Faculty of Law.",
+      "track_type": "pedestrian",
+      "source": "google-maps",
+      "coordinates": [
+        [
+          7.62001,
+          4.2032
+        ],
+        [
+          7.61997,
+          4.20362
+        ],
+        [
+          7.62073,
+          4.20407
+        ],
+        [
+          7.62072,
+          4.20412
+        ],
+        [
+          7.62065,
+          4.20477
+        ],
+        [
+          7.62064,
+          4.20484
+        ],
+        [
+          7.62058,
+          4.20531
+        ],
+        [
+          7.61971,
+          4.20547
+        ],
+        [
+          7.61958,
+          4.20549
+        ]
+      ]
+    },
+    {
+      "name": "Mark & Luke Halls Courtyard Walkway",
+      "description": "Pedestrian courtyard walkway connecting Northern Hostel Road to Mark Hall and Luke Hall.",
+      "track_type": "pedestrian",
+      "source": "campus-walkway",
+      "coordinates": [
+        [
+          7.62296,
+          4.20387
+        ],
+        [
+          7.62342,
+          4.20389
+        ],
+        [
+          7.623832,
+          4.203938
+        ],
+        [
+          7.6238,
+          4.20438
+        ],
+        [
+          7.623735,
+          4.20482
+        ],
+        [
+          7.62313,
+          4.20477
+        ]
+      ]
+    },
+    {
+      "name": "Gamaliel Onosode Hall Courtyard Walkway",
+      "description": "Pedestrian walkway from Northern Hostel Road into Gamaliel Onosode Hall courtyard.",
+      "track_type": "pedestrian",
+      "source": "campus-walkway",
+      "coordinates": [
+        [
+          7.62344,
+          4.20625
+        ],
+        [
+          7.62378,
+          4.20632
+        ],
+        [
+          7.624078,
+          4.206412
+        ]
+      ]
+    },
+    {
+      "name": "Library to Worship Centre Lawn Walkway",
+      "description": "Direct pedestrian walkway from Timothy Olagbenro Library across the chapel quad to Bowen Worship Centre.",
+      "track_type": "pedestrian",
+      "source": "campus-walkway",
+      "coordinates": [
+        [
+          7.61944,
+          4.20156
+        ],
+        [
+          7.61982,
+          4.20198
+        ],
+        [
+          7.62016,
+          4.202449
+        ],
+        [
+          7.62012,
+          4.20321
+        ]
+      ]
+    },
+    {
+      "name": "Sadler Hostel & Sports Complex Walkway",
+      "description": "Pedestrian walkway connecting Western Campus Drive to Sadler Female Hostel, Football Field, and BUPAF.",
+      "track_type": "pedestrian",
+      "source": "campus-walkway",
+      "coordinates": [
+        [
+          7.6231,
+          4.19399
+        ],
+        [
+          7.623265,
+          4.192443
+        ],
+        [
+          7.623812,
+          4.192489
+        ],
+        [
+          7.624089,
+          4.193036
+        ],
+        [
+          7.62417,
+          4.19402
+        ]
       ]
     }
   ]
 }
-

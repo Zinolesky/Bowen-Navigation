@@ -50,6 +50,13 @@ class TrackViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Track.objects.all()
     serializer_class = TrackGeoSerializer
 
+    def get_queryset(self):
+        queryset = Track.objects.all()
+        track_type = self.request.query_params.get("track_type")
+        if track_type:
+            queryset = queryset.filter(track_type=track_type)
+        return queryset
+
 
 class PointOfInterestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffAdminOrReadOnly]
@@ -61,7 +68,12 @@ class PointOfInterestViewSet(viewsets.ModelViewSet):
 
         search = self.request.query_params.get("search")
         if search:
-            queryset = queryset.filter(Q(name__icontains=search) | Q(category__name__icontains=search))
+            queryset = queryset.filter(
+                Q(name__icontains=search)
+                | Q(description__icontains=search)
+                | Q(category__name__icontains=search)
+                | Q(building__name__icontains=search)
+            )
 
         category = self.request.query_params.get("category")
         if category:
@@ -76,15 +88,29 @@ class PointOfInterestViewSet(viewsets.ModelViewSet):
 
 
 def _read_coordinate(data, key):
-    value = data.get(key)
+    import math
+
+    value = data.get(key) if isinstance(data, dict) else None
+    lat_raw = None
+    lon_raw = None
     if isinstance(value, dict):
-        return {
-            "latitude": float(value.get("latitude")),
-            "longitude": float(value.get("longitude")),
-        }
-    if isinstance(value, (list, tuple)) and len(value) == 2:
-        return {"latitude": float(value[0]), "longitude": float(value[1])}
-    raise ValueError(f"{key} must be a coordinate object or [latitude, longitude] pair.")
+        lat_raw = value.get("latitude")
+        lon_raw = value.get("longitude")
+    elif isinstance(value, (list, tuple)) and len(value) == 2:
+        lat_raw, lon_raw = value[0], value[1]
+    else:
+        raise ValueError(f"{key} must be a coordinate object or [latitude, longitude] pair.")
+
+    if lat_raw is None or lon_raw is None:
+        raise ValueError(f"{key} requires both latitude and longitude.")
+
+    lat = float(lat_raw)
+    lon = float(lon_raw)
+    if math.isnan(lat) or math.isnan(lon) or math.isinf(lat) or math.isinf(lon):
+        raise ValueError(f"{key} coordinates must be finite numbers.")
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        raise ValueError(f"{key} coordinates are out of valid geographic bounds.")
+    return {"latitude": lat, "longitude": lon}
 
 
 @api_view(["POST"])
@@ -96,8 +122,17 @@ def directions(request):
     except (TypeError, ValueError) as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-    route = dijkstra_route(origin, destination)
+    mode = request.data.get("mode", "walking") if isinstance(request.data, dict) else "walking"
+    route = dijkstra_route(origin, destination, mode=mode)
+    if isinstance(route, dict) and route.get("duration_text"):
+        from .markers import render_route_callout_data_uri
+
+        route["duration_badge_uri"] = render_route_callout_data_uri(
+            route["duration_text"],
+            mode=route.get("mode") or mode,
+        )
     return Response(route)
+
 
 
 @api_view(["POST"])

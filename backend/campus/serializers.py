@@ -35,6 +35,11 @@ class PointOfInterestGeoSerializer(GeoFeatureModelSerializer):
     building = BuildingSerializer(read_only=True)
     latitude = serializers.SerializerMethodField()
     longitude = serializers.SerializerMethodField()
+    marker_icon_default = serializers.SerializerMethodField()
+    marker_icon_compact = serializers.SerializerMethodField()
+    marker_icon_selected = serializers.SerializerMethodField()
+    marker_icon_destination = serializers.SerializerMethodField()
+    marker_anchor_x = serializers.SerializerMethodField()
 
     class Meta:
         model = PointOfInterest
@@ -51,6 +56,11 @@ class PointOfInterestGeoSerializer(GeoFeatureModelSerializer):
             "icon_identifier",
             "latitude",
             "longitude",
+            "marker_icon_default",
+            "marker_icon_compact",
+            "marker_icon_selected",
+            "marker_icon_destination",
+            "marker_anchor_x",
             "is_active",
             "updated_at",
         )
@@ -60,6 +70,28 @@ class PointOfInterestGeoSerializer(GeoFeatureModelSerializer):
 
     def get_longitude(self, obj):
         return obj.location.x if obj.location else None
+
+    def _get_marker_tuple(self, obj, variant: str):
+        from .markers import render_poi_marker_data_uri
+
+        color = getattr(obj.category, "color", "#2563EB") if obj.category_id else "#2563EB"
+        icon = obj.icon_identifier or (getattr(obj.category, "icon_identifier", "building-2") if obj.category_id else "building-2")
+        return render_poi_marker_data_uri(obj.name, color, icon, variant)
+
+    def get_marker_icon_default(self, obj):
+        return self._get_marker_tuple(obj, "default")[0]
+
+    def get_marker_icon_compact(self, obj):
+        return self._get_marker_tuple(obj, "compact")[0]
+
+    def get_marker_icon_selected(self, obj):
+        return self._get_marker_tuple(obj, "selected")[0]
+
+    def get_marker_icon_destination(self, obj):
+        return self._get_marker_tuple(obj, "destination")[0]
+
+    def get_marker_anchor_x(self, obj):
+        return self._get_marker_tuple(obj, "default")[1]
 
 
 class PointOfInterestWriteSerializer(serializers.ModelSerializer):
@@ -106,10 +138,18 @@ class PointOfInterestWriteSerializer(serializers.ModelSerializer):
 
 
 class TrackGeoSerializer(GeoFeatureModelSerializer):
+    track_type = serializers.SerializerMethodField()
+
     class Meta:
         model = Track
         geo_field = "geometry"
-        fields = ("id", "name", "description", "source", "updated_at")
+        fields = ("id", "name", "description", "track_type", "source", "updated_at")
+
+    def get_track_type(self, obj):
+        from .routing import resolve_track_type
+
+        return resolve_track_type(obj)
+
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

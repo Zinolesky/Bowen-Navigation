@@ -59,8 +59,9 @@ export default function SearchScreen() {
   }, [pois, query, selectedCategory]);
 
   function openPoi(poi: Poi) {
-    router.push({ pathname: "/(app)/map", params: { poi: String(poi.id) } });
+    router.push({ pathname: "/(app)/map", params: { poi: String(poi.id), t: String(Date.now()) } });
   }
+
 
   return (
     <SafeAreaView style={styles.screen}>

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: bowen
       POSTGRES_PASSWORD: bowen_dev_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgis_data:/var/lib/postgresql/data
     healthcheck:
@@ -36,11 +36,18 @@ services:
     container_name: bowen_navigator_backend
     restart: always
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
       - ./backend/.env
     environment:
       - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=bowen_navigator
+      - POSTGRES_USER=bowen
+      - POSTGRES_PASSWORD=bowen_dev_password
+    volumes:
+      - ./backend:/app
+      - ./data:/data
     depends_on:
       db:
         condition: service_healthy

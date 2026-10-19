@@ -37,7 +37,7 @@ By using Docker, you completely avoid having to manually install Python, Postgre
 
 ```powershell
 cd mobile
-npx expo start
+npx expo start  
 ```
 
 The default seeded student login is:

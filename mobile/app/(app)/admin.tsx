@@ -29,6 +29,8 @@ type FormState = {
   latitude: string;
   longitude: string;
   category_id?: number;
+  building_id?: number | null;
+  google_place_id?: string;
   icon_identifier: string;
 };
 
@@ -36,8 +38,9 @@ const emptyForm: FormState = {
   name: "",
   description: "",
   operating_hours: "",
-  latitude: "7.6236297",
-  longitude: "4.1889662",
+  latitude: "7.621500",
+  longitude: "4.199000",
+  google_place_id: "",
   icon_identifier: "map-pin"
 };
 
@@ -61,7 +64,7 @@ export default function AdminScreen() {
       setCategories(categoryData);
       setPois(
         poiData.features.map((feature) =>
-          featureToPoi(feature as { geometry: { coordinates: number[] }; properties: PoiProperties })
+          featureToPoi(feature as { id?: number; geometry: { coordinates: number[] }; properties: PoiProperties })
         )
       );
       setForm((current) => ({
@@ -69,7 +72,7 @@ export default function AdminScreen() {
         category_id: current.category_id || categoryData[0]?.id,
         icon_identifier: current.icon_identifier || categoryData[0]?.icon_identifier || "map-pin"
       }));
-    } catch (error) {
+    } catch {
       Alert.alert("Admin unavailable", "Check the API connection and try again.");
     } finally {
       setLoading(false);
@@ -100,6 +103,8 @@ export default function AdminScreen() {
       latitude: String(poi.latitude),
       longitude: String(poi.longitude),
       category_id: poi.category.id,
+      building_id: poi.building?.id ?? null,
+      google_place_id: poi.google_place_id || "",
       icon_identifier: poi.icon_identifier || poi.category.icon_identifier
     });
   }
@@ -113,11 +118,22 @@ export default function AdminScreen() {
   }
 
   async function savePoi() {
-    const latitude = Number(form.latitude);
-    const longitude = Number(form.longitude);
+    const latitude = Number(form.latitude.trim());
+    const longitude = Number(form.longitude.trim());
 
-    if (!form.name.trim() || !form.category_id || Number.isNaN(latitude) || Number.isNaN(longitude)) {
-      Alert.alert("Missing POI details", "Name, category, latitude, and longitude are required.");
+    if (
+      !form.name.trim() ||
+      !form.category_id ||
+      !form.latitude.trim() ||
+      !form.longitude.trim() ||
+      Number.isNaN(latitude) ||
+      Number.isNaN(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      Alert.alert("Invalid POI details", "Name, category, and valid latitude/longitude coordinates are required.");
       return;
     }
 
@@ -128,10 +144,11 @@ export default function AdminScreen() {
         description: form.description.trim(),
         operating_hours: form.operating_hours.trim(),
         category_id: form.category_id,
+        building_id: form.building_id ?? null,
         latitude,
         longitude,
         icon_identifier: form.icon_identifier || selectedCategory?.icon_identifier || "map-pin",
-        google_place_id: "",
+        google_place_id: form.google_place_id ?? "",
         is_active: true
       };
 
@@ -142,7 +159,7 @@ export default function AdminScreen() {
       }
       resetForm();
       await load();
-    } catch (error) {
+    } catch {
       Alert.alert("Save failed", "The POI could not be saved.");
     } finally {
       setSaving(false);
@@ -158,8 +175,11 @@ export default function AdminScreen() {
         onPress: async () => {
           try {
             await deletePoi(poi.id);
+            if (form.id === poi.id) {
+              resetForm();
+            }
             await load();
-          } catch (error) {
+          } catch {
             Alert.alert("Delete failed", "The POI could not be deleted.");
           }
         }
@@ -180,111 +200,120 @@ export default function AdminScreen() {
           </Pressable>
         </View>
 
-        <ScrollView style={styles.formCard} contentContainerStyle={styles.formContent}>
-          <View style={styles.formHeader}>
-            <Plus size={18} color={colors.primary} />
-            <Text style={styles.formTitle}>{form.id ? "Edit point of interest" : "New point of interest"}</Text>
-          </View>
+        <FlatList
+          data={loading ? [] : pois}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.poiList}
+          ListHeaderComponent={
+            <View style={styles.formCard}>
+              <View style={styles.formHeader}>
+                <Plus size={18} color={colors.primary} />
+                <Text style={styles.formTitle}>{form.id ? "Edit point of interest" : "New point of interest"}</Text>
+              </View>
 
-          <Text style={styles.label}>Name</Text>
-          <TextInput value={form.name} onChangeText={(name) => setForm((current) => ({ ...current, name }))} style={styles.input} />
-
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            value={form.description}
-            onChangeText={(description) => setForm((current) => ({ ...current, description }))}
-            style={[styles.input, styles.multiInput]}
-            multiline
-          />
-
-          <Text style={styles.label}>Operating hours</Text>
-          <TextInput
-            value={form.operating_hours}
-            onChangeText={(operating_hours) => setForm((current) => ({ ...current, operating_hours }))}
-            style={styles.input}
-            placeholder="Mon-Fri, 8:00 AM - 5:00 PM"
-            placeholderTextColor="#8A9691"
-          />
-
-          <Text style={styles.label}>Category</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-            {categories.map((category) => {
-              const active = category.id === form.category_id;
-              return (
-                <Pressable
-                  key={category.id}
-                  onPress={() =>
-                    setForm((current) => ({
-                      ...current,
-                      category_id: category.id,
-                      icon_identifier: category.icon_identifier
-                    }))
-                  }
-                  style={[styles.categoryChip, active && styles.categoryChipActive, { borderColor: category.color }]}
-                >
-                  <Text style={[styles.categoryText, active && styles.categoryTextActive]}>{category.name}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <View style={styles.coordinateRow}>
-            <View style={styles.coordinateInput}>
-              <Text style={styles.label}>Latitude</Text>
+              <Text style={styles.label}>Name</Text>
               <TextInput
-                value={form.latitude}
-                onChangeText={(latitude) => setForm((current) => ({ ...current, latitude }))}
+                value={form.name}
+                onChangeText={(name) => setForm((current) => ({ ...current, name }))}
                 style={styles.input}
-                keyboardType="decimal-pad"
               />
-            </View>
-            <View style={styles.coordinateInput}>
-              <Text style={styles.label}>Longitude</Text>
+
+              <Text style={styles.label}>Description</Text>
               <TextInput
-                value={form.longitude}
-                onChangeText={(longitude) => setForm((current) => ({ ...current, longitude }))}
-                style={styles.input}
-                keyboardType="decimal-pad"
+                value={form.description}
+                onChangeText={(description) => setForm((current) => ({ ...current, description }))}
+                style={[styles.input, styles.multiInput]}
+                multiline
               />
-            </View>
-          </View>
 
-          <View style={styles.formActions}>
-            <Pressable onPress={savePoi} disabled={saving} style={styles.saveButton}>
-              {saving ? <ActivityIndicator color="#FFFFFF" /> : <Save size={17} color="#FFFFFF" />}
-              <Text style={styles.saveText}>{form.id ? "Update POI" : "Create POI"}</Text>
-            </Pressable>
-            <Pressable onPress={resetForm} style={styles.cancelButton}>
-              <Text style={styles.cancelText}>Clear</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
+              <Text style={styles.label}>Operating hours</Text>
+              <TextInput
+                value={form.operating_hours}
+                onChangeText={(operating_hours) => setForm((current) => ({ ...current, operating_hours }))}
+                style={styles.input}
+                placeholder="Mon-Fri, 8:00 AM - 5:00 PM"
+                placeholderTextColor="#8A9691"
+              />
 
-        {loading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : (
-          <FlatList
-            data={pois}
-            keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.poiList}
-            renderItem={({ item }) => (
-              <Pressable onPress={() => editPoi(item)} style={styles.poiRow}>
-                <MarkerBadge color={item.category.color} icon={item.icon_identifier || item.category.icon_identifier} />
-                <View style={styles.poiText}>
-                  <Text style={styles.poiName}>{item.name}</Text>
-                  <Text style={styles.poiMeta}>
-                    {item.category.name} - {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}
-                  </Text>
+              <Text style={styles.label}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+                {categories.map((category) => {
+                  const active = category.id === form.category_id;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() =>
+                        setForm((current) => ({
+                          ...current,
+                          category_id: category.id,
+                          icon_identifier: category.icon_identifier
+                        }))
+                      }
+                      style={[
+                        styles.categoryChip,
+                        active && styles.categoryChipActive,
+                        { borderColor: category.color }
+                      ]}
+                    >
+                      <Text style={[styles.categoryText, active && styles.categoryTextActive]}>{category.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.coordinateRow}>
+                <View style={styles.coordinateInput}>
+                  <Text style={styles.label}>Latitude</Text>
+                  <TextInput
+                    value={form.latitude}
+                    onChangeText={(latitude) => setForm((current) => ({ ...current, latitude }))}
+                    style={styles.input}
+                    keyboardType="decimal-pad"
+                  />
                 </View>
-                <Pressable onPress={() => removePoi(item)} style={styles.deleteButton}>
-                  <Trash2 size={18} color={colors.danger} />
+                <View style={styles.coordinateInput}>
+                  <Text style={styles.label}>Longitude</Text>
+                  <TextInput
+                    value={form.longitude}
+                    onChangeText={(longitude) => setForm((current) => ({ ...current, longitude }))}
+                    style={styles.input}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formActions}>
+                <Pressable onPress={savePoi} disabled={saving} style={styles.saveButton}>
+                  {saving ? <ActivityIndicator color="#FFFFFF" /> : <Save size={17} color="#FFFFFF" />}
+                  <Text style={styles.saveText}>{form.id ? "Update POI" : "Create POI"}</Text>
                 </Pressable>
+                <Pressable onPress={resetForm} style={styles.cancelButton}>
+                  <Text style={styles.cancelText}>Clear</Text>
+                </Pressable>
+              </View>
+
+              {loading && (
+                <View style={styles.loading}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              )}
+            </View>
+          }
+          renderItem={({ item }) => (
+            <Pressable onPress={() => editPoi(item)} style={styles.poiRow}>
+              <MarkerBadge color={item.category.color} icon={item.icon_identifier || item.category.icon_identifier} />
+              <View style={styles.poiText}>
+                <Text style={styles.poiName}>{item.name}</Text>
+                <Text style={styles.poiMeta}>
+                  {item.category.name} - {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}
+                </Text>
+              </View>
+              <Pressable onPress={() => removePoi(item)} style={styles.deleteButton}>
+                <Trash2 size={18} color={colors.danger} />
               </Pressable>
-            )}
-          />
-        )}
+            </Pressable>
+          )}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -330,15 +359,12 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   formCard: {
-    marginHorizontal: 18,
-    maxHeight: 360,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.surface
-  },
-  formContent: {
-    padding: 14
+    backgroundColor: colors.surface,
+    padding: 14,
+    marginBottom: 12
   },
   formHeader: {
     flexDirection: "row",
@@ -435,12 +461,13 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   loading: {
-    flex: 1,
+    paddingVertical: 20,
     alignItems: "center",
     justifyContent: "center"
   },
   poiList: {
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 24,
     gap: 10
   },
   poiRow: {
@@ -487,4 +514,3 @@ const styles = StyleSheet.create({
     marginTop: 8
   }
 });
-

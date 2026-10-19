@@ -50,6 +50,11 @@ export type PoiProperties = {
   icon_identifier: string;
   latitude: number;
   longitude: number;
+  marker_icon_default?: string;
+  marker_icon_compact?: string;
+  marker_icon_selected?: string;
+  marker_icon_destination?: string;
+  marker_anchor_x?: number;
   is_active: boolean;
 };
 
@@ -58,10 +63,15 @@ export type Poi = PoiProperties & {
   longitude: number;
 };
 
+export type PathwayType = "pedestrian" | "vehicle" | "both";
+
+export type TravelMode = "walking" | "driving";
+
 export type TrackProperties = {
   id: number;
   name: string;
   description: string;
+  track_type?: PathwayType;
   source: string;
 };
 
@@ -73,12 +83,13 @@ export type RouteStep = {
 };
 
 export type DirectionsResponse = {
-  provider: "google" | "local-fallback";
+  provider: "google" | "local-fallback" | "bowen-routing";
+  mode?: TravelMode;
   status: string;
   summary?: string;
   distance_text?: string;
   duration_text?: string;
+  duration_badge_uri?: string;
   overview_polyline: string;
   steps: RouteStep[];
 };
-

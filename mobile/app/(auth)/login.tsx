@@ -32,8 +32,23 @@ export default function LoginScreen() {
     try {
       await signIn(fullName, matricNumber);
       router.replace("/(app)/map");
-    } catch (error) {
-      Alert.alert("Login failed", "Check the details and make sure the backend is running.");
+    } catch (error: any) {
+      let message = "Check your details and make sure the backend is reachable.";
+      if (error?.response?.data) {
+        const data = error.response.data;
+        if (typeof data === "string") {
+          message = data;
+        } else if (Array.isArray(data)) {
+          message = data.join("\n");
+        } else if (typeof data === "object") {
+          message = Object.entries(data)
+            .map(([field, err]) => (Array.isArray(err) ? err.join(" ") : `${field}: ${err}`))
+            .join("\n");
+        }
+      } else if (error?.message) {
+        message = error.message;
+      }
+      Alert.alert("Login failed", message);
     } finally {
       setSubmitting(false);
     }
