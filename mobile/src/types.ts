@@ -79,6 +79,12 @@ export type RouteStep = {
   instruction: string;
   distance_text: string;
   duration_text: string;
+  distance_meters?: number;
+  duration_seconds?: number;
+  maneuver?: string;
+  road_name?: string;
+  start_location?: { latitude: number; longitude: number };
+  end_location?: { latitude: number; longitude: number };
   polyline?: string;
 };
 
@@ -89,6 +95,8 @@ export type DirectionsResponse = {
   summary?: string;
   distance_text?: string;
   duration_text?: string;
+  distance_meters?: number;
+  duration_seconds?: number;
   duration_badge_uri?: string;
   overview_polyline: string;
   steps: RouteStep[];

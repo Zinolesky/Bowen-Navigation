@@ -692,6 +692,29 @@ def _turn_phrase(prev_bearing: float, new_bearing: float) -> Optional[str]:
     return "Make a sharp right" if diff > 0 else "Make a sharp left"
 
 
+def _maneuver_code(turn: Optional[str], is_start: bool = False, is_end: bool = False) -> str:
+    if is_start:
+        return "depart"
+    if is_end:
+        return "arrive"
+    if not turn:
+        return "straight"
+    t = turn.lower()
+    if "sharp right" in t:
+        return "turn-sharp-right"
+    if "sharp left" in t:
+        return "turn-sharp-left"
+    if "slight right" in t:
+        return "turn-slight-right"
+    if "slight left" in t:
+        return "turn-slight-left"
+    if "right" in t:
+        return "turn-right"
+    if "left" in t:
+        return "turn-left"
+    return "straight"
+
+
 def _format_distance(meters: float) -> str:
     m = max(1, round(meters))
     return f"{m / 1000:.1f} km" if m >= 1000 else f"{m} m"
@@ -740,6 +763,7 @@ def _build_turn_by_turn_steps(
     curr_dist = raw_segs[0][2]
     curr_name = raw_segs[0][4]
     first_bearing = raw_segs[0][3]
+    curr_maneuver = "depart"
     curr_instruction = (
         f"Head {_compass_direction(first_bearing)} on {curr_name}"
         if curr_name and curr_name not in ("Access Path", "Direct Path")
@@ -760,12 +784,19 @@ def _build_turn_by_turn_steps(
                     "instruction": f"{curr_instruction}.",
                     "distance_text": _format_distance(curr_dist),
                     "duration_text": _format_duration(curr_dist, speed_m_per_min),
+                    "distance_meters": round(curr_dist, 1),
+                    "duration_seconds": max(1, round((curr_dist / speed_m_per_min) * 60)),
+                    "maneuver": curr_maneuver,
+                    "road_name": curr_name or "Campus Pathway",
+                    "start_location": {"latitude": curr_coords[0][1], "longitude": curr_coords[0][0]},
+                    "end_location": {"latitude": curr_coords[-1][1], "longitude": curr_coords[-1][0]},
                     "polyline": encode_polyline(lat_lng_pts),
                 }
             )
             curr_coords = [u, v]
             curr_dist = dist
             curr_name = name or curr_name
+            curr_maneuver = _maneuver_code(turn)
             action = turn or "Continue straight"
             if name and name not in ("Access Path", "Direct Path"):
                 curr_instruction = f"{action} onto {name}"
@@ -786,6 +817,12 @@ def _build_turn_by_turn_steps(
             "instruction": f"{curr_instruction}.",
             "distance_text": _format_distance(curr_dist),
             "duration_text": _format_duration(curr_dist, speed_m_per_min),
+            "distance_meters": round(curr_dist, 1),
+            "duration_seconds": max(1, round((curr_dist / speed_m_per_min) * 60)),
+            "maneuver": curr_maneuver,
+            "road_name": curr_name or "Campus Pathway",
+            "start_location": {"latitude": curr_coords[0][1], "longitude": curr_coords[0][0]},
+            "end_location": {"latitude": curr_coords[-1][1], "longitude": curr_coords[-1][0]},
             "polyline": encode_polyline(lat_lng_pts),
         }
     )
@@ -795,6 +832,12 @@ def _build_turn_by_turn_steps(
             "instruction": "Arrive at your destination.",
             "distance_text": "Finish",
             "duration_text": "",
+            "distance_meters": 0.0,
+            "duration_seconds": 0,
+            "maneuver": "arrive",
+            "road_name": "Destination",
+            "start_location": {"latitude": path[-1][1], "longitude": path[-1][0]},
+            "end_location": {"latitude": path[-1][1], "longitude": path[-1][0]},
             "polyline": "",
         }
     )
@@ -928,6 +971,8 @@ def dijkstra_route(origin: dict, destination: dict, mode: str = "walking") -> di
         "summary": mode_label,
         "distance_text": _format_distance(rounded_distance),
         "duration_text": f"{minutes} min" if minutes == 1 else f"{minutes} mins",
+        "distance_meters": rounded_distance,
+        "duration_seconds": round((total_distance_m / speed) * 60),
         "overview_polyline": encoded_polyline,
         "steps": steps,
     }

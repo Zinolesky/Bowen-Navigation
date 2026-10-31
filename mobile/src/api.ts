@@ -1,4 +1,5 @@
 import axios from "axios";
+import Constants from "expo-constants";
 
 import type {
   Category,
@@ -11,11 +12,31 @@ import type {
   User
 } from "./types";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+function resolveApiUrl(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (envUrl && envUrl.startsWith("https://")) {
+    return envUrl;
+  }
+
+  // In Expo Go on LAN, auto-derive backend host from Metro bundler's hostUri ONLY if it is a LAN IPv4 address.
+  // Never append :8001 to an Expo tunnel domain (e.g. *.exp.direct), because tunnel domains only forward port 80 -> 8081.
+  const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest2?.extra?.expoClient?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(":")[0];
+    const isLanIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) && host !== "127.0.0.1";
+    if (isLanIpv4) {
+      return `http://${host}:8001/api`;
+    }
+  }
+
+  return envUrl || "http://127.0.0.1:8001/api";
+}
+
+export const API_URL = resolveApiUrl();
 
 export const api = axios.create({
   baseURL: API_URL,
-  timeout: 15000
+  timeout: 25000
 });
 
 let refreshTokenValue: string | undefined;

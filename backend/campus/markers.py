@@ -202,8 +202,9 @@ def render_poi_marker_data_uri(
 
         final_w = max(1, canvas_size // ss)
         final_img = img.resize((final_w, final_w), resample=Image.Resampling.LANCZOS)
+        quantized = final_img.quantize(colors=64, method=Image.Quantize.FASTOCTREE)
         buffer = io.BytesIO()
-        final_img.save(buffer, format="PNG", optimize=True)
+        quantized.save(buffer, format="PNG", optimize=True, compress_level=9)
         b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
         return f"data:image/png;base64,{b64}", 0.5
 
@@ -304,9 +305,10 @@ def render_poi_marker_data_uri(
     final_w = max(1, canvas_w // ss)
     final_h = max(1, canvas_h // ss)
     final_img = img.resize((final_w, final_h), resample=Image.Resampling.LANCZOS)
+    quantized = final_img.quantize(colors=64, method=Image.Quantize.FASTOCTREE)
 
     buffer = io.BytesIO()
-    final_img.save(buffer, format="PNG", optimize=True)
+    quantized.save(buffer, format="PNG", optimize=True, compress_level=9)
     b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
 
     anchor_x = round((badge_cx / ss) / final_w, 4)
