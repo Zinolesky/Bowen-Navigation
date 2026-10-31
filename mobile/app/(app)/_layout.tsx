@@ -36,14 +36,14 @@ export default function AppTabs() {
         name="map"
         options={{
           title: "Map",
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="map" color={color} size={size} />
+          tabBarIcon: ({ color, size }) => <MaterialIcons name="map" color={color as string} size={size} />
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
           title: "Search",
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="search" color={color} size={size} />
+          tabBarIcon: ({ color, size }) => <MaterialIcons name="search" color={color as string} size={size} />
         }}
       />
       <Tabs.Screen
@@ -51,7 +51,7 @@ export default function AppTabs() {
         options={{
           title: "Admin",
           href: user?.is_staff_admin ? "/(app)/admin" : null,
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="admin-panel-settings" color={color} size={size} />
+          tabBarIcon: ({ color, size }) => <MaterialIcons name="admin-panel-settings" color={color as string} size={size} />
         }}
       />
     </Tabs>

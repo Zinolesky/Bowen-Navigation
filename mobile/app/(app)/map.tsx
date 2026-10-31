@@ -282,7 +282,7 @@ export default function MapScreen() {
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
 
-  const simulationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
 
   const panY = useRef(new Animated.Value(0)).current;
