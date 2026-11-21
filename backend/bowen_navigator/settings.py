@@ -81,6 +81,7 @@ MIDDLEWARE = [
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -117,6 +118,18 @@ DATABASES = {
         "PASSWORD": config("POSTGRES_PASSWORD", default="bowen_dev_password"),
         "HOST": config("POSTGRES_HOST", default="127.0.0.1"),
         "PORT": config("POSTGRES_PORT", default="5432"),
+        "CONN_MAX_AGE": config("POSTGRES_CONN_MAX_AGE", default=60, cast=int),
+        "CONN_HEALTH_CHECKS": True,
+    }
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "bowen-navigator-cache",
+        "OPTIONS": {
+            "MAX_ENTRIES": 2000,
+        },
     }
 }
 
@@ -144,6 +157,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
     ),
 }
 

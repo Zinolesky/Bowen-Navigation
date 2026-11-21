@@ -7,10 +7,12 @@ from .views import (
     CategoryViewSet,
     PointOfInterestViewSet,
     TrackViewSet,
+    campus_bootstrap,
     directions,
     health_check,
     login,
     place_details,
+    place_photo,
 )
 
 router = DefaultRouter()
@@ -23,9 +25,9 @@ urlpatterns = [
     path("health/", health_check, name="health-check"),
     path("auth/login/", login, name="login"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path("bootstrap/", campus_bootstrap, name="campus-bootstrap"),
     path("directions/", directions, name="directions"),
     path("places/details/", place_details, name="place-details"),
+    path("places/photo/", place_photo, name="place-photo"),
     path("", include(router.urls)),
 ]
-
-

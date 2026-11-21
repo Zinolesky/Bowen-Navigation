@@ -1,8 +1,10 @@
+from collections import OrderedDict
 import heapq
 import math
+import threading
 from typing import Dict, List, Optional, Tuple
 
-from .google import encode_polyline, haversine_meters
+from .google import encode_polyline
 from .models import Track, infer_track_type_from_text
 
 # Precision of 7 decimal places (~1.1cm at the equator) for canonical node keys
@@ -17,7 +19,34 @@ SAME_POINT_EPS_METERS = 0.25
 WALKING_METERS_PER_MIN = 80.0
 DRIVING_METERS_PER_MIN = 400.0
 
+MAIN_GATE_LONLAT: Tuple[float, float] = (4.190647, 7.621044)
+CAMPUS_CENTER_LONLAT: Tuple[float, float] = (4.1990, 7.6215)
+
 Coord = Tuple[float, float]  # (lon, lat)
+EdgeXY = Tuple[Coord, Coord, float, float, float, float, float, float, float, str, str]
+# (u, v, ux, uy, vx, vy, cost, dist_m, mult, name, track_type)
+GraphType = Dict[Coord, List[Tuple[Coord, float, float, str, str]]]
+EdgeMetaType = Dict[Tuple[Coord, Coord], Tuple[str, str]]
+NodeXYType = Dict[Coord, Tuple[float, float]]
+
+_CACHE_LOCK = threading.RLock()
+_CACHE_VERSION = 0
+_META_CACHE: Optional[Tuple[int, Tuple[Coord, ...], Optional[Coord]]] = None
+_GRAPH_CACHE: Dict[
+    str, Tuple[int, GraphType, List[EdgeXY], EdgeMetaType, NodeXYType]
+] = {}
+_ROUTE_CACHE: OrderedDict = OrderedDict()
+_ROUTE_CACHE_MAX = 256
+
+
+def clear_routing_cache() -> None:
+    """Invalidate compiled topological graphs, vertex metadata, and cached routes."""
+    global _CACHE_VERSION, _META_CACHE
+    with _CACHE_LOCK:
+        _CACHE_VERSION += 1
+        _META_CACHE = None
+        _GRAPH_CACHE.clear()
+        _ROUTE_CACHE.clear()
 
 
 def _round_coord(coord: Tuple[float, float]) -> Coord:
@@ -62,6 +91,9 @@ class _LocalProjection:
                 self.ref_lat + (y / self.meters_per_lat),
             )
         )
+
+
+CAMPUS_PROJ = _LocalProjection(ref_lon=CAMPUS_CENTER_LONLAT[0], ref_lat=CAMPUS_CENTER_LONLAT[1])
 
 
 def _project_point_to_segment_xy(
@@ -155,21 +187,14 @@ def normalize_travel_mode(mode: Optional[str]) -> str:
 def _build_topological_network(
     tracks_with_weights: List[Tuple[Track, str, float]],
     proj: _LocalProjection,
-) -> Tuple[
-    Dict[Coord, List[Tuple[Coord, float, float, str, str]]],
-    List[Tuple[Coord, Coord, float, float, str, str]],
-]:
+) -> Tuple[GraphType, List[EdgeXY], EdgeMetaType, NodeXYType]:
     """
     Builds a topologically connected graph from the given tracks:
     1. Preserves intra-track geometry (never collapses consecutive vertices of the same curve).
     2. Snaps track endpoints / shared vertices within ENDPOINT_SNAP_METERS.
-    3. Splits segments at all X-intersections (segment crossings) and T-junctions
-       (where a track endpoint or junction vertex lies within JUNCTION_SNAP_METERS of a segment).
-    Returns:
-      - graph: { node: [(neighbor, cost_weight, true_dist_m, track_name, track_type), ...] }
-      - edges: [(u, v, cost_weight, true_dist_m, track_name, track_type), ...]
+    3. Splits segments at all X-intersections and T-junctions.
+    Returns precomputed graph, pre-projected edges_xy, edge_meta, and node_xy.
     """
-    # Collect cleaned coordinate sequences per track
     cleaned_tracks = []
     for track, eff_type, weight_mult in tracks_with_weights:
         raw_coords = list(track.geometry.coords) if track.geometry else []
@@ -184,11 +209,9 @@ def _build_topological_network(
             cleaned_tracks.append((track.id, track.name or "Campus Path", eff_type, weight_mult, pts))
 
     if not cleaned_tracks:
-        return {}, []
+        return {}, [], {}, {}
 
-    # Step 1: Canonicalize close vertices across different tracks (especially endpoints)
-    # Priority given to track endpoints so junctions converge cleanly.
-    canonical_xy: List[Tuple[Coord, float, float, int, bool]] = []  # (coord, x, y, track_id, is_endpoint)
+    canonical_xy: List[Tuple[Coord, float, float, int, bool]] = []
 
     def _get_canonical_point(pt: Coord, track_id: int, is_endpoint: bool) -> Coord:
         px, py = proj.to_xy(pt[0], pt[1])
@@ -197,7 +220,6 @@ def _build_topological_network(
         snap_radius = ENDPOINT_SNAP_METERS if is_endpoint else 2.5
 
         for c_coord, cx, cy, c_tid, c_is_ep in canonical_xy:
-            # Never snap two vertices of the same track to each other unless it's a closed loop endpoint
             if c_tid == track_id and not is_endpoint:
                 continue
             dist = math.hypot(px - cx, py - cy)
@@ -211,7 +233,6 @@ def _build_topological_network(
         canonical_xy.append((pt, px, py, track_id, is_endpoint))
         return pt
 
-    # Register all track endpoints first so they act as anchor nodes
     track_anchored_pts: List[Tuple[int, str, str, float, List[Coord]]] = []
     endpoint_coords_set = set()
 
@@ -233,8 +254,6 @@ def _build_topological_network(
         if len(anchored) >= 2:
             track_anchored_pts.append((track_id, name, eff_type, weight_mult, anchored))
 
-    # Build raw segments list
-    # Each segment: (track_id, name, eff_type, weight_mult, p1, p2, ax, ay, bx, by)
     raw_segments = []
     for track_id, name, eff_type, weight_mult, pts in track_anchored_pts:
         for i in range(len(pts) - 1):
@@ -248,11 +267,9 @@ def _build_topological_network(
             raw_segments.append((track_id, name, eff_type, weight_mult, p1, p2, ax, ay, bx, by))
 
     num_segs = len(raw_segments)
-    # Split points per segment index: list of (t, Coord)
     seg_splits: List[List[Tuple[float, Coord]]] = [
         [(0.0, seg[4]), (1.0, seg[5])] for seg in raw_segments
     ]
-    # Additional short bridge edges for T-junctions where endpoint V is slightly off segment S
     bridge_edges: List[Tuple[Coord, Coord, float, float, str, str]] = []
 
     # Step 2: Detect all X-intersections between segments
@@ -263,11 +280,9 @@ def _build_topological_network(
 
         for j in range(i + 1, num_segs):
             tid_j, name_j, type_j, mult_j, p1_j, p2_j, cx, cy, dx, dy = raw_segments[j]
-            # Share an exact endpoint already?
             if p1_i == p1_j or p1_i == p2_j or p2_i == p1_j or p2_i == p2_j:
                 continue
 
-            # Bounding box check
             min_x_j, max_x_j = (cx, dx) if cx <= dx else (dx, cx)
             min_y_j, max_y_j = (cy, dy) if cy <= dy else (dy, cy)
             if max_x_i + 1.0 < min_x_j or max_x_j + 1.0 < min_x_i:
@@ -282,8 +297,7 @@ def _build_topological_network(
                 seg_splits[i].append((t_i, inter_coord))
                 seg_splits[j].append((u_j, inter_coord))
 
-    # Step 3: Detect all T-junctions (vertex/endpoint of one track near interior of another segment)
-    # Gather unique vertices with metadata: coord -> (vx, vy, set_of_track_ids, is_track_endpoint)
+    # Step 3: Detect all T-junctions
     vertex_info: Dict[Coord, Tuple[float, float, set, bool]] = {}
     for tid, name, eff_type, mult, p1, p2, ax, ay, bx, by in raw_segments:
         for pt, px, py in ((p1, ax, ay), (p2, bx, by)):
@@ -295,9 +309,6 @@ def _build_topological_network(
                 vertex_info[pt] = (vx, vy, tids, is_ep or (pt in endpoint_coords_set))
 
     for v_coord, (vx, vy, v_tids, is_ep) in vertex_info.items():
-        # Track endpoints get a slightly more generous T-junction snap tolerance (7m)
-        # than intermediate vertices (3.5m) so parallel sidewalks don't fuse mid-block,
-        # while paths terminating on a road/walkway always connect.
         tol = JUNCTION_SNAP_METERS if is_ep else 3.5
 
         for j in range(num_segs):
@@ -322,11 +333,10 @@ def _build_topological_network(
 
                 if proj_coord != v_coord:
                     true_d = _haversine_float(v_coord[0], v_coord[1], proj_coord[0], proj_coord[1])
-                    # Short virtual connector across the T-junction gap
                     bridge_edges.append((v_coord, proj_coord, true_d * mult_j, true_d, name_j, type_j))
 
-    # Step 4: Assemble adjacency graph and split edges list
-    graph: Dict[Coord, List[Tuple[Coord, float, float, str, str]]] = {}
+    # Step 4: Assemble adjacency graph, edge_meta, preprojected edges_xy, and node_xy
+    graph: GraphType = {}
     edge_map: Dict[Tuple[Coord, Coord], Tuple[float, float, str, str]] = {}
 
     def _register_undirected_edge(u: Coord, v: Coord, cost: float, dist_m: float, name: str, t_type: str):
@@ -360,13 +370,117 @@ def _build_topological_network(
     for u, v, cost, dist_m, name, t_type in bridge_edges:
         _register_undirected_edge(u, v, max(0.05, cost), max(0.05, dist_m), name, t_type)
 
-    edges_list: List[Tuple[Coord, Coord, float, float, str, str]] = []
+    edges_xy: List[EdgeXY] = []
+    base_edge_meta: EdgeMetaType = {}
+    node_xy: NodeXYType = {}
+
     for (u, v), (cost, dist_m, name, t_type) in edge_map.items():
+        if u not in node_xy:
+            node_xy[u] = proj.to_xy(u[0], u[1])
+        if v not in node_xy:
+            node_xy[v] = proj.to_xy(v[0], v[1])
+        ux, uy = node_xy[u]
+        vx, vy = node_xy[v]
+        mult = (cost / dist_m) if dist_m > 0 else 1.0
+        if mult < 1.0:
+            mult = 1.0
         graph.setdefault(u, []).append((v, cost, dist_m, name, t_type))
         graph.setdefault(v, []).append((u, cost, dist_m, name, t_type))
-        edges_list.append((u, v, cost, dist_m, name, t_type))
+        base_edge_meta[(u, v)] = (name, t_type)
+        base_edge_meta[(v, u)] = (name, t_type)
+        edges_xy.append((u, v, ux, uy, vx, vy, cost, dist_m, mult, name, t_type))
 
-    return graph, edges_list
+    return graph, edges_xy, base_edge_meta, node_xy
+
+
+def _get_campus_vertex_meta() -> Tuple[Tuple[Coord, ...], Optional[Coord]]:
+    """Returns cached (all_track_vertices, closest_gate_vertex) for off-campus detection."""
+    global _META_CACHE
+    with _CACHE_LOCK:
+        version = _CACHE_VERSION
+        if _META_CACHE is not None and _META_CACHE[0] == version:
+            return _META_CACHE[1], _META_CACHE[2]
+
+    all_tracks = list(Track.objects.all())
+    verts: List[Coord] = []
+    closest_gate_vertex: Optional[Coord] = None
+    min_gate_dist = float("inf")
+
+    for t in all_tracks:
+        if not t.geometry:
+            continue
+        for lon, lat in t.geometry.coords:
+            c = _round_coord((lon, lat))
+            verts.append(c)
+            d_gate = _haversine_float(MAIN_GATE_LONLAT[0], MAIN_GATE_LONLAT[1], c[0], c[1])
+            if d_gate < min_gate_dist:
+                min_gate_dist = d_gate
+                closest_gate_vertex = c
+
+    verts_tuple = tuple(verts)
+    with _CACHE_LOCK:
+        if _CACHE_VERSION == version:
+            _META_CACHE = (version, verts_tuple, closest_gate_vertex)
+    return verts_tuple, closest_gate_vertex
+
+
+def _get_cached_network(
+    network_key: str,
+) -> Tuple[GraphType, List[EdgeXY], EdgeMetaType, NodeXYType]:
+    """
+    Returns cached (graph, edges_xy, base_edge_meta, node_xy) for one of:
+    - 'driving'
+    - 'walking_strict'
+    - 'walking_hybrid'
+    """
+    with _CACHE_LOCK:
+        version = _CACHE_VERSION
+        cached = _GRAPH_CACHE.get(network_key)
+        if cached is not None and cached[0] == version:
+            return cached[1], cached[2], cached[3], cached[4]
+
+    all_tracks = list(Track.objects.all())
+    if not all_tracks:
+        return {}, [], {}, {}
+
+    classified: List[Tuple[Track, str]] = [(t, resolve_track_type(t)) for t in all_tracks]
+
+    if network_key == "driving":
+        selected = [
+            (t, et, 1.0)
+            for t, et in classified
+            if et in (Track.TRACK_TYPE_VEHICLE, Track.TRACK_TYPE_BOTH)
+        ]
+        if not selected:
+            selected = [(t, et, 1.0) for t, et in classified]
+    elif network_key == "walking_strict":
+        selected = [
+            (t, et, 1.0)
+            for t, et in classified
+            if et in (Track.TRACK_TYPE_PEDESTRIAN, Track.TRACK_TYPE_BOTH)
+        ]
+    else:  # 'walking_hybrid'
+        selected = [
+            (
+                t,
+                et,
+                1.0 if et in (Track.TRACK_TYPE_PEDESTRIAN, Track.TRACK_TYPE_BOTH) else 3.0,
+            )
+            for t, et in classified
+        ]
+
+    if not selected:
+        graph: GraphType = {}
+        edges_xy: List[EdgeXY] = []
+        edge_meta: EdgeMetaType = {}
+        node_xy: NodeXYType = {}
+    else:
+        graph, edges_xy, edge_meta, node_xy = _build_topological_network(selected, CAMPUS_PROJ)
+
+    with _CACHE_LOCK:
+        if _CACHE_VERSION == version:
+            _GRAPH_CACHE[network_key] = (version, graph, edges_xy, edge_meta, node_xy)
+    return graph, edges_xy, edge_meta, node_xy
 
 
 def build_graph(mode: str = "walking") -> Dict[Coord, List[Tuple[Coord, float]]]:
@@ -375,25 +489,13 @@ def build_graph(mode: str = "walking") -> Dict[Coord, List[Tuple[Coord, float]]]
     Each node is a coordinate (lon, lat), and edges are (neighbor, distance_in_meters).
     """
     norm_mode = normalize_travel_mode(mode)
-    all_tracks = list(Track.objects.all())
-    if not all_tracks:
-        return {}
-
-    classified = [(t, resolve_track_type(t)) for t in all_tracks]
-    if norm_mode == "driving":
-        selected = [(t, et, 1.0) for t, et in classified if et in (Track.TRACK_TYPE_VEHICLE, Track.TRACK_TYPE_BOTH)]
-        if not selected:
-            selected = [(t, et, 1.0) for t, et in classified]
-    else:
-        selected = [(t, et, 1.0) for t, et in classified if et in (Track.TRACK_TYPE_PEDESTRIAN, Track.TRACK_TYPE_BOTH)]
-        if not selected:
-            selected = [(t, et, 1.0) for t, et in classified]
-
-    proj = _LocalProjection()
-    full_graph, _ = _build_topological_network(selected, proj)
+    key = "driving" if norm_mode == "driving" else "walking_strict"
+    graph, _, _, _ = _get_cached_network(key)
+    if not graph and norm_mode == "walking":
+        graph, _, _, _ = _get_cached_network("walking_hybrid")
     return {
         node: [(nbr, dist_m) for nbr, _cost, dist_m, _name, _type in nbrs]
-        for node, nbrs in full_graph.items()
+        for node, nbrs in graph.items()
     }
 
 
@@ -424,19 +526,15 @@ def _clean_path(path: List[Coord]) -> List[Coord]:
     if len(path) <= 2:
         return path
 
-    # 1. Deduplicate near-identical consecutive points and collapse immediate A -> B -> A spikes
     deduped: List[Coord] = []
     for pt in path:
         if deduped and _haversine_float(deduped[-1][0], deduped[-1][1], pt[0], pt[1]) < 0.2:
             continue
         if len(deduped) >= 2 and _haversine_float(deduped[-2][0], deduped[-2][1], pt[0], pt[1]) < 0.4:
-            # Collapsed A -> B -> A backtrack
             deduped.pop()
             continue
         deduped.append(pt)
 
-    # 1b. Prune narrow U-shaped pocket detours (e.g. dipping into a building parking spur and back out
-    # to the same road corridor within 18m when the detour is >= 2.8x longer than the direct gap)
     pocket_changed = True
     while pocket_changed and len(deduped) >= 5:
         pocket_changed = False
@@ -462,33 +560,27 @@ def _clean_path(path: List[Coord]) -> List[Coord]:
             if pruned:
                 break
 
-    # 2. Check if the first intermediate point (deduped[1]) or last intermediate point (deduped[-2])
-    # forms a sharp backtracking hook with origin/destination
-    proj = _LocalProjection()
     changed = True
     while changed and len(deduped) >= 3:
         changed = False
-        # Check start hook: deduped[0] -> deduped[1] -> deduped[2]
-        ax, ay = proj.to_xy(*deduped[0])
-        bx, by = proj.to_xy(*deduped[1])
-        cx, cy = proj.to_xy(*deduped[2])
+        ax, ay = CAMPUS_PROJ.to_xy(*deduped[0])
+        bx, by = CAMPUS_PROJ.to_xy(*deduped[1])
+        cx, cy = CAMPUS_PROJ.to_xy(*deduped[2])
         v1x, v1y = ax - bx, ay - by
         v2x, v2y = cx - bx, cy - by
         len1 = math.hypot(v1x, v1y)
         len2 = math.hypot(v2x, v2y)
         if len1 > 0.1 and len2 > 0.1:
             cos_angle = (v1x * v2x + v1y * v2y) / (len1 * len2)
-            # If the angle at B between BA and BC is < 35 degrees (cos > 0.82) and origin is close to segment BC
             if cos_angle > 0.82 and len1 < 25.0:
                 deduped.pop(1)
                 changed = True
                 continue
 
-        # Check end hook: deduped[-3] -> deduped[-2] -> deduped[-1]
         if len(deduped) >= 3:
-            ax, ay = proj.to_xy(*deduped[-3])
-            bx, by = proj.to_xy(*deduped[-2])
-            cx, cy = proj.to_xy(*deduped[-1])
+            ax, ay = CAMPUS_PROJ.to_xy(*deduped[-3])
+            bx, by = CAMPUS_PROJ.to_xy(*deduped[-2])
+            cx, cy = CAMPUS_PROJ.to_xy(*deduped[-1])
             v1x, v1y = ax - bx, ay - by
             v2x, v2y = cx - bx, cy - by
             len1 = math.hypot(v1x, v1y)
@@ -505,35 +597,31 @@ def _clean_path(path: List[Coord]) -> List[Coord]:
 def _solve_route_on_network(
     origin_lonlat: Coord,
     dest_lonlat: Coord,
-    base_graph: Dict[Coord, List[Tuple[Coord, float, float, str, str]]],
-    edges_list: List[Tuple[Coord, Coord, float, float, str, str]],
-    proj: _LocalProjection,
-) -> Optional[Tuple[List[Coord], float, Dict[Tuple[Coord, Coord], Tuple[str, str]]]]:
+    base_graph: GraphType,
+    edges_xy: List[EdgeXY],
+    base_edge_meta: EdgeMetaType,
+    node_xy: NodeXYType,
+) -> Optional[Tuple[List[Coord], float, EdgeMetaType]]:
     """
-    Projects origin and destination onto the closest edges of the topological network,
-    inserts virtual access nodes, and finds the globally optimal path via Dijkstra.
-    Returns (cleaned_path, total_distance_meters, edge_meta_lookup) or None if unreachable.
+    Projects origin and destination onto closest pre-projected edges, uses a shallow
+    copy-on-write adjacency overlay (no full-graph clone), and finds the exact optimal
+    path via A* with a strictly admissible Euclidean heuristic.
     """
-    if not base_graph or not edges_list:
+    if not base_graph or not edges_xy:
         return None
 
-    ox, oy = proj.to_xy(*origin_lonlat)
-    dx, dy = proj.to_xy(*dest_lonlat)
+    ox, oy = CAMPUS_PROJ.to_xy(*origin_lonlat)
+    dx, dy = CAMPUS_PROJ.to_xy(*dest_lonlat)
 
-    # Evaluate perpendicular projection of origin and destination onto every edge
     orig_candidates = []
     dest_candidates = []
 
-    for idx, (u, v, cost, dist_m, name, t_type) in enumerate(edges_list):
-        ux, uy = proj.to_xy(*u)
-        vx, vy = proj.to_xy(*v)
-        mult = (cost / dist_m) if dist_m > 0 else 1.0
-
+    for idx, (u, v, ux, uy, vx, vy, _cost, _dist_m, mult, _name, _t_type) in enumerate(edges_xy):
         pox, poy, to, do = _project_point_to_segment_xy(ox, oy, ux, uy, vx, vy)
-        orig_candidates.append((do, idx, to, proj.to_lonlat(pox, poy), mult))
+        orig_candidates.append((do, idx, to, CAMPUS_PROJ.to_lonlat(pox, poy), pox, poy, mult))
 
         pdx, pdy, td, dd = _project_point_to_segment_xy(dx, dy, ux, uy, vx, vy)
-        dest_candidates.append((dd, idx, td, proj.to_lonlat(pdx, pdy), mult))
+        dest_candidates.append((dd, idx, td, CAMPUS_PROJ.to_lonlat(pdx, pdy), pdx, pdy, mult))
 
     orig_candidates.sort(key=lambda item: item[0])
     dest_candidates.sort(key=lambda item: item[0])
@@ -541,8 +629,6 @@ def _solve_route_on_network(
     min_orig_d = orig_candidates[0][0]
     min_dest_d = dest_candidates[0][0]
 
-    # Select nearby candidate edges (closest edge + any edge within min_dist + 25m, up to 6 edges)
-    # This prevents snapping to a road on the wrong side of a building and looping around!
     selected_orig = [
         c for c in orig_candidates[:6] if c[0] <= max(min_orig_d + 25.0, 35.0)
     ] or [orig_candidates[0]]
@@ -550,94 +636,103 @@ def _solve_route_on_network(
         c for c in dest_candidates[:6] if c[0] <= max(min_dest_d + 25.0, 35.0)
     ] or [dest_candidates[0]]
 
-    # Clone adjacency graph so we can split the candidate edges at the exact projection points
-    working_graph: Dict[Coord, List[Tuple[Coord, float, float, str, str]]] = {
-        node: list(nbrs) for node, nbrs in base_graph.items()
-    }
-    edge_meta: Dict[Tuple[Coord, Coord], Tuple[str, str]] = {}
-    for u, v, _cost, _dist_m, name, t_type in edges_list:
-        edge_meta[(u, v)] = (name, t_type)
-        edge_meta[(v, u)] = (name, t_type)
+    # Copy-on-write adjacency & metadata overlays so the cached graph isn't cloned or mutated
+    overlay_graph: GraphType = {}
+    overlay_meta: EdgeMetaType = {}
+    local_node_xy: NodeXYType = {}
 
-    # Group splits by edge index so if origin and destination project onto the SAME edge,
-    # the edge is split into sub-segments [u -> proj1 -> proj2 -> v] allowing direct travel!
-    edge_splits: Dict[int, List[Tuple[float, Coord]]] = {}
-    for _d, idx, t_param, p_coord, _mult in selected_orig:
-        edge_splits.setdefault(idx, []).append((t_param, p_coord))
-    for _d, idx, t_param, p_coord, _mult in selected_dest:
-        edge_splits.setdefault(idx, []).append((t_param, p_coord))
+    def _add_overlay_edge(a: Coord, b: Coord, seg_cost: float, seg_d: float, name: str, t_type: str):
+        if a not in overlay_graph:
+            overlay_graph[a] = list(base_graph.get(a, ()))
+        overlay_graph[a].append((b, seg_cost, seg_d, name, t_type))
+
+    edge_splits: Dict[int, List[Tuple[float, Coord, float, float]]] = {}
+    for _d, idx, t_param, p_coord, px, py, _mult in selected_orig:
+        edge_splits.setdefault(idx, []).append((t_param, p_coord, px, py))
+    for _d, idx, t_param, p_coord, px, py, _mult in selected_dest:
+        edge_splits.setdefault(idx, []).append((t_param, p_coord, px, py))
 
     for idx, splits in edge_splits.items():
-        u, v, cost, dist_m, name, t_type = edges_list[idx]
-        mult = (cost / dist_m) if dist_m > 0 else 1.0
-        all_pts = [(0.0, u)] + sorted(splits, key=lambda s: s[0]) + [(1.0, v)]
-        chain: List[Coord] = []
-        for _, pt in all_pts:
-            if not chain or _haversine_float(chain[-1][0], chain[-1][1], pt[0], pt[1]) >= 0.05:
-                chain.append(pt)
+        u, v, ux, uy, vx, vy, _cost, _dist_m, mult, name, t_type = edges_xy[idx]
+        all_pts = [(0.0, u, ux, uy)] + sorted(splits, key=lambda s: s[0]) + [(1.0, v, vx, vy)]
+        chain: List[Tuple[Coord, float, float]] = []
+        for _, pt, ptx, pty in all_pts:
+            if not chain or _haversine_float(chain[-1][0][0], chain[-1][0][1], pt[0], pt[1]) >= 0.05:
+                chain.append((pt, ptx, pty))
         for k in range(len(chain) - 1):
-            a, b = chain[k], chain[k + 1]
+            a, ax_p, ay_p = chain[k]
+            b, bx_p, by_p = chain[k + 1]
+            local_node_xy.setdefault(a, (ax_p, ay_p))
+            local_node_xy.setdefault(b, (bx_p, by_p))
             seg_d = _haversine_float(a[0], a[1], b[0], b[1])
             seg_cost = seg_d * mult
-            working_graph.setdefault(a, []).append((b, seg_cost, seg_d, name, t_type))
-            working_graph.setdefault(b, []).append((a, seg_cost, seg_d, name, t_type))
-            edge_meta[(a, b)] = (name, t_type)
-            edge_meta[(b, a)] = (name, t_type)
+            _add_overlay_edge(a, b, seg_cost, seg_d, name, t_type)
+            _add_overlay_edge(b, a, seg_cost, seg_d, name, t_type)
+            overlay_meta[(a, b)] = (name, t_type)
+            overlay_meta[(b, a)] = (name, t_type)
 
-    # Virtual sentinel coordinates for exact origin and destination
     start_sentinel: Coord = (round(origin_lonlat[0], 7) - 1000.0, round(origin_lonlat[1], 7))
     end_sentinel: Coord = (round(dest_lonlat[0], 7) + 1000.0, round(dest_lonlat[1], 7))
-    working_graph[start_sentinel] = []
-    working_graph.setdefault(end_sentinel, [])
+    overlay_graph[start_sentinel] = []
+    overlay_graph[end_sentinel] = []
+    local_node_xy[start_sentinel] = (ox, oy)
+    local_node_xy[end_sentinel] = (dx, dy)
 
-    # Access penalty slightly > 1.0 prefers using pathways over off-path straight lines
     access_penalty = 1.25
-    for d_m, _idx, _t, p_coord, mult in selected_orig:
+    for _d_m, _idx, _t, p_coord, px, py, mult in selected_orig:
         true_d = _haversine_float(origin_lonlat[0], origin_lonlat[1], p_coord[0], p_coord[1])
-        # Penalize entering via a heavily weighted track (e.g. vehicle road in walking mode)
-        working_graph[start_sentinel].append(
+        local_node_xy.setdefault(p_coord, (px, py))
+        overlay_graph[start_sentinel].append(
             (p_coord, true_d * access_penalty * mult, true_d, "Access Path", "access")
         )
 
-    for d_m, _idx, _t, p_coord, mult in selected_dest:
+    for _d_m, _idx, _t, p_coord, px, py, mult in selected_dest:
         true_d = _haversine_float(dest_lonlat[0], dest_lonlat[1], p_coord[0], p_coord[1])
-        working_graph.setdefault(p_coord, []).append(
-            (end_sentinel, true_d * access_penalty * mult, true_d, "Access Path", "access")
+        local_node_xy.setdefault(p_coord, (px, py))
+        _add_overlay_edge(
+            p_coord, end_sentinel, true_d * access_penalty * mult, true_d, "Access Path", "access"
         )
 
-    # If origin and destination are very close to each other (< 25m) and tracks are further away,
-    # allow direct connection
     direct_dist = _haversine_float(origin_lonlat[0], origin_lonlat[1], dest_lonlat[0], dest_lonlat[1])
     if direct_dist <= 25.0 or (min_orig_d + min_dest_d > direct_dist * 1.2 and direct_dist <= 60.0):
-        working_graph[start_sentinel].append(
+        overlay_graph[start_sentinel].append(
             (end_sentinel, direct_dist * 1.5, direct_dist, "Direct Path", "access")
         )
 
-    # Dijkstra's Algorithm
-    queue: List[Tuple[float, Coord]] = [(0.0, start_sentinel)]
-    costs: Dict[Coord, float] = {start_sentinel: 0.0}
-    true_dists: Dict[Coord, float] = {start_sentinel: 0.0}
+    def _heuristic(node: Coord) -> float:
+        if node == end_sentinel:
+            return 0.0
+        xy = node_xy.get(node) or local_node_xy.get(node)
+        if xy is None:
+            return 0.0
+        return 0.95 * math.hypot(xy[0] - dx, xy[1] - dy)
+
+    # Admissible A* Search
+    queue: List[Tuple[float, float, Coord]] = [(_heuristic(start_sentinel), 0.0, start_sentinel)]
+    g_costs: Dict[Coord, float] = {start_sentinel: 0.0}
     prev_node: Dict[Coord, Optional[Coord]] = {start_sentinel: None}
 
     while queue:
-        curr_cost, curr = heapq.heappop(queue)
+        _f_cost, curr_g, curr = heapq.heappop(queue)
         if curr == end_sentinel:
             break
-        if curr_cost > costs.get(curr, float("inf")):
+        if curr_g > g_costs.get(curr, float("inf")):
             continue
 
-        for nbr, edge_cost, edge_dist, _ename, _etype in working_graph.get(curr, []):
-            new_cost = curr_cost + edge_cost
-            if new_cost < costs.get(nbr, float("inf")):
-                costs[nbr] = new_cost
-                true_dists[nbr] = true_dists[curr] + edge_dist
+        nbrs = overlay_graph.get(curr)
+        if nbrs is None:
+            nbrs = base_graph.get(curr, ())
+
+        for nbr, edge_cost, _edge_dist, _ename, _etype in nbrs:
+            new_g = curr_g + edge_cost
+            if new_g < g_costs.get(nbr, float("inf")):
+                g_costs[nbr] = new_g
                 prev_node[nbr] = curr
-                heapq.heappush(queue, (new_cost, nbr))
+                heapq.heappush(queue, (new_g + _heuristic(nbr), new_g, nbr))
 
     if end_sentinel not in prev_node or prev_node[end_sentinel] is None:
         return None
 
-    # Reconstruct node chain excluding sentinels
     chain_nodes: List[Coord] = []
     curr_ptr = prev_node[end_sentinel]
     while curr_ptr is not None and curr_ptr != start_sentinel:
@@ -648,12 +743,16 @@ def _solve_route_on_network(
     full_path: List[Coord] = [origin_lonlat] + chain_nodes + [dest_lonlat]
     cleaned = _clean_path(full_path)
 
-    # Recalculate true physical distance along the cleaned path
     total_dist = 0.0
+    combined_meta: EdgeMetaType = {}
     for i in range(len(cleaned) - 1):
-        total_dist += _haversine_float(cleaned[i][0], cleaned[i][1], cleaned[i + 1][0], cleaned[i + 1][1])
+        u, v = cleaned[i], cleaned[i + 1]
+        total_dist += _haversine_float(u[0], u[1], v[0], v[1])
+        meta = overlay_meta.get((u, v)) or base_edge_meta.get((u, v))
+        if meta is not None:
+            combined_meta[(u, v)] = meta
 
-    return cleaned, total_dist, edge_meta
+    return cleaned, total_dist, combined_meta
 
 
 def _bearing_degrees(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
@@ -729,7 +828,7 @@ def _format_duration(meters: float, speed_m_per_min: float) -> str:
 
 def _build_turn_by_turn_steps(
     path: List[Coord],
-    edge_meta: Dict[Tuple[Coord, Coord], Tuple[str, str]],
+    edge_meta: EdgeMetaType,
     mode: str,
     speed_m_per_min: float,
 ) -> List[dict]:
@@ -744,7 +843,7 @@ def _build_turn_by_turn_steps(
         if dist < 0.2:
             continue
         bearing = _bearing_degrees(u[0], u[1], v[0], v[1])
-        name, t_type = edge_meta.get((u, v), ("", ""))
+        name, _t_type = edge_meta.get((u, v), ("", ""))
         raw_segs.append((u, v, dist, bearing, name))
 
     if not raw_segs:
@@ -753,11 +852,16 @@ def _build_turn_by_turn_steps(
                 "instruction": "You have arrived at your destination.",
                 "distance_text": "0 m",
                 "duration_text": "Now",
+                "distance_meters": 0.0,
+                "duration_seconds": 0,
+                "maneuver": "arrive",
+                "road_name": "Destination",
+                "start_location": {"latitude": path[-1][1], "longitude": path[-1][0]},
+                "end_location": {"latitude": path[-1][1], "longitude": path[-1][0]},
                 "polyline": "",
             }
         ]
 
-    # Group consecutive segments into navigation steps based on significant turns or track name changes
     steps: List[dict] = []
     curr_coords: List[Coord] = [raw_segs[0][0], raw_segs[0][1]]
     curr_dist = raw_segs[0][2]
@@ -777,7 +881,6 @@ def _build_turn_by_turn_steps(
         name_changed = bool(name and name != curr_name and name not in ("Access Path", "Direct Path"))
 
         if (turn and curr_dist >= 8.0) or (name_changed and curr_dist >= 15.0):
-            # Flush current step
             lat_lng_pts = [(lat, lon) for lon, lat in curr_coords]
             steps.append(
                 {
@@ -810,7 +913,6 @@ def _build_turn_by_turn_steps(
         if dist >= 2.0:
             prev_bearing = bearing
 
-    # Flush final traversal step
     lat_lng_pts = [(lat, lon) for lon, lat in curr_coords]
     steps.append(
         {
@@ -844,138 +946,159 @@ def _build_turn_by_turn_steps(
     return steps
 
 
-def dijkstra_route(origin: dict, destination: dict, mode: str = "walking") -> dict:
+def _solve_mode(
+    origin_lonlat: Coord,
+    dest_lonlat: Coord,
+    norm_mode: str,
+) -> Optional[Tuple[List[Coord], float, EdgeMetaType]]:
+    if norm_mode == "driving":
+        graph, edges_xy, edge_meta, node_xy = _get_cached_network("driving")
+        return _solve_route_on_network(origin_lonlat, dest_lonlat, graph, edges_xy, edge_meta, node_xy)
+
+    direct_dist = _haversine_float(origin_lonlat[0], origin_lonlat[1], dest_lonlat[0], dest_lonlat[1])
+    ped_graph, ped_edges_xy, ped_meta, ped_node_xy = _get_cached_network("walking_strict")
+    if ped_graph:
+        ped_sol = _solve_route_on_network(
+            origin_lonlat, dest_lonlat, ped_graph, ped_edges_xy, ped_meta, ped_node_xy
+        )
+        if ped_sol is not None:
+            ped_path, ped_dist, _ = ped_sol
+            start_gap = (
+                _haversine_float(origin_lonlat[0], origin_lonlat[1], ped_path[1][0], ped_path[1][1])
+                if len(ped_path) > 2
+                else 0.0
+            )
+            end_gap = (
+                _haversine_float(dest_lonlat[0], dest_lonlat[1], ped_path[-2][0], ped_path[-2][1])
+                if len(ped_path) > 2
+                else 0.0
+            )
+            if (
+                start_gap <= 120.0
+                and end_gap <= 120.0
+                and ped_dist <= max(direct_dist * 2.6, direct_dist + 250.0)
+            ):
+                return ped_sol
+
+    hyb_graph, hyb_edges_xy, hyb_meta, hyb_node_xy = _get_cached_network("walking_hybrid")
+    return _solve_route_on_network(
+        origin_lonlat, dest_lonlat, hyb_graph, hyb_edges_xy, hyb_meta, hyb_node_xy
+    )
+
+
+def dijkstra_route(
+    origin: dict,
+    destination: dict,
+    mode: str = "walking",
+    include_alternate: bool = True,
+) -> dict:
     """
-    Calculates an accurate, mode-aware shortest path using a topologically split graph
-    (supporting X-intersections, T-junctions, and perpendicular edge projection).
-    Separates pedestrian pathways from vehicle roads based on `mode` ('walking' vs 'driving').
+    Calculates an accurate, mode-aware shortest path using a precompiled cached
+    topological graph and admissible A* search (supporting X-intersections, T-junctions,
+    and perpendicular edge projection).
     """
     norm_mode = normalize_travel_mode(mode)
     speed = DRIVING_METERS_PER_MIN if norm_mode == "driving" else WALKING_METERS_PER_MIN
     mode_label = "Campus Driving Route" if norm_mode == "driving" else "Campus Walking Route"
 
-    all_tracks = list(Track.objects.all())
-    if not all_tracks:
+    verts, closest_gate_vertex = _get_campus_vertex_meta()
+    if not verts:
         return _fallback_route(origin, destination, f"No {norm_mode} tracks available on campus.", mode=norm_mode)
 
-    origin_lonlat: Coord = _round_coord((float(origin["longitude"]), float(origin["latitude"])))
+    raw_origin: Coord = _round_coord((float(origin["longitude"]), float(origin["latitude"])))
     dest_lonlat: Coord = _round_coord((float(destination["longitude"]), float(destination["latitude"])))
+    origin_lonlat = raw_origin
 
-    # If the user's device GPS is off-campus (> 3 km from all campus tracks, e.g. testing from Lagos),
-    # automatically start the campus route from Bowen University Main Gate (closest track node to 7.621044, 4.190647)
-    # instead of drawing a 150+ km straight line across the map.
-    main_gate_lonlat: Coord = (4.190647, 7.621044)
-    min_dist_to_network = float("inf")
-    closest_gate_vertex: Optional[Coord] = None
-    min_gate_dist = float("inf")
-
-    for t in all_tracks:
-        if not t.geometry:
-            continue
-        for lon, lat in t.geometry.coords:
-            d_orig = _haversine_float(origin_lonlat[0], origin_lonlat[1], lon, lat)
-            if d_orig < min_dist_to_network:
-                min_dist_to_network = d_orig
-            d_gate = _haversine_float(main_gate_lonlat[0], main_gate_lonlat[1], lon, lat)
-            if d_gate < min_gate_dist:
-                min_gate_dist = d_gate
-                closest_gate_vertex = _round_coord((lon, lat))
+    # Off-campus detection (> 3 km from all campus tracks, fast O(1) short-circuit > 8 km from campus center)
+    dist_from_center = _haversine_float(
+        origin_lonlat[0], origin_lonlat[1], CAMPUS_CENTER_LONLAT[0], CAMPUS_CENTER_LONLAT[1]
+    )
+    if dist_from_center > 8000.0:
+        min_dist_to_network = dist_from_center
+    else:
+        min_dist_to_network = min(
+            _haversine_float(origin_lonlat[0], origin_lonlat[1], v[0], v[1]) for v in verts
+        )
 
     if min_dist_to_network > 3000.0 and closest_gate_vertex is not None:
         origin_lonlat = closest_gate_vertex
         mode_label = f"From Main Gate • {mode_label}"
 
-    proj = _LocalProjection(
-        ref_lon=(origin_lonlat[0] + dest_lonlat[0]) / 2.0,
-        ref_lat=(origin_lonlat[1] + dest_lonlat[1]) / 2.0,
-    )
+    with _CACHE_LOCK:
+        cache_key = (
+            _CACHE_VERSION,
+            norm_mode,
+            bool(include_alternate),
+            round(origin_lonlat[0], 5),
+            round(origin_lonlat[1], 5),
+            round(dest_lonlat[0], 5),
+            round(dest_lonlat[1], 5),
+            mode_label,
+        )
+        cached = _ROUTE_CACHE.get(cache_key)
+        if cached is not None:
+            _ROUTE_CACHE.move_to_end(cache_key)
+            return dict(cached)
 
-    classified: List[Tuple[Track, str]] = [(t, resolve_track_type(t)) for t in all_tracks]
-
-    solution = None
-
-    if norm_mode == "driving":
-        # Vehicles strictly use vehicle or shared ('both') roads, NEVER pedestrian footpaths
-        vehicle_tracks = [
-            (t, et, 1.0)
-            for t, et in classified
-            if et in (Track.TRACK_TYPE_VEHICLE, Track.TRACK_TYPE_BOTH)
-        ]
-        # Fallback to all tracks only if no vehicle/both tracks exist in DB at all
-        if not vehicle_tracks:
-            vehicle_tracks = [(t, et, 1.0) for t, et in classified]
-
-        graph, edges = _build_topological_network(vehicle_tracks, proj)
-        solution = _solve_route_on_network(origin_lonlat, dest_lonlat, graph, edges, proj)
-    else:
-        # Walking (pedestrian) mode:
-        # 1. First try strictly pedestrian + shared ('both') pathways so pedestrians aren't
-        #    routed onto vehicle roads when pedestrian walkways exist.
-        ped_tracks = [
-            (t, et, 1.0)
-            for t, et in classified
-            if et in (Track.TRACK_TYPE_PEDESTRIAN, Track.TRACK_TYPE_BOTH)
-        ]
-        direct_dist = _haversine_float(origin_lonlat[0], origin_lonlat[1], dest_lonlat[0], dest_lonlat[1])
-
-        if ped_tracks:
-            ped_graph, ped_edges = _build_topological_network(ped_tracks, proj)
-            ped_sol = _solve_route_on_network(origin_lonlat, dest_lonlat, ped_graph, ped_edges, proj)
-            if ped_sol is not None:
-                ped_path, ped_dist, _ = ped_sol
-                # Check that origin and destination aren't stranded far from the pedestrian network
-                start_gap = (
-                    _haversine_float(origin_lonlat[0], origin_lonlat[1], ped_path[1][0], ped_path[1][1])
-                    if len(ped_path) > 2
-                    else 0.0
-                )
-                end_gap = (
-                    _haversine_float(dest_lonlat[0], dest_lonlat[1], ped_path[-2][0], ped_path[-2][1])
-                    if len(ped_path) > 2
-                    else 0.0
-                )
-                # Accept strict pedestrian route if access gaps are reasonable and it's not an extreme detour
-                if start_gap <= 120.0 and end_gap <= 120.0 and ped_dist <= max(direct_dist * 2.6, direct_dist + 250.0):
-                    solution = ped_sol
-
-        # 2. If strict pedestrian network couldn't connect origin & destination cleanly,
-        #    build a combined network where pedestrian/shared tracks have 1.0x weight and
-        #    vehicle roads have a 3.0x penalty (used only to bridge disconnected segments).
-        if solution is None:
-            hybrid_tracks = [
-                (
-                    t,
-                    et,
-                    1.0 if et in (Track.TRACK_TYPE_PEDESTRIAN, Track.TRACK_TYPE_BOTH) else 3.0,
-                )
-                for t, et in classified
-            ]
-            hyb_graph, hyb_edges = _build_topological_network(hybrid_tracks, proj)
-            solution = _solve_route_on_network(origin_lonlat, dest_lonlat, hyb_graph, hyb_edges, proj)
-
+    solution = _solve_mode(origin_lonlat, dest_lonlat, norm_mode)
     if solution is None:
         return _fallback_route(origin, destination, "No continuous path found to the destination.", mode=norm_mode)
 
     path, total_distance_m, edge_meta = solution
     rounded_distance = max(1, round(total_distance_m))
     minutes = max(1, round(total_distance_m / speed))
+    duration_text = f"{minutes} min" if minutes == 1 else f"{minutes} mins"
+    distance_text = _format_distance(rounded_distance)
+    duration_seconds = round((total_distance_m / speed) * 60)
 
     lat_lng_path = [(lat, lon) for lon, lat in path]
     encoded_polyline = encode_polyline(lat_lng_path)
     steps = _build_turn_by_turn_steps(path, edge_meta, norm_mode, speed)
 
-    return {
+    result = {
         "provider": "bowen-routing",
         "mode": norm_mode,
         "status": "OK",
         "summary": mode_label,
-        "distance_text": _format_distance(rounded_distance),
-        "duration_text": f"{minutes} min" if minutes == 1 else f"{minutes} mins",
+        "distance_text": distance_text,
+        "duration_text": duration_text,
         "distance_meters": rounded_distance,
-        "duration_seconds": round((total_distance_m / speed) * 60),
+        "duration_seconds": duration_seconds,
         "overview_polyline": encoded_polyline,
         "steps": steps,
     }
+
+    if include_alternate:
+        other_mode = "driving" if norm_mode == "walking" else "walking"
+        other_speed = DRIVING_METERS_PER_MIN if other_mode == "driving" else WALKING_METERS_PER_MIN
+        alternate_modes = {
+            norm_mode: {
+                "distance_text": distance_text,
+                "duration_text": duration_text,
+                "distance_meters": rounded_distance,
+                "duration_seconds": duration_seconds,
+            }
+        }
+        other_sol = _solve_mode(origin_lonlat, dest_lonlat, other_mode)
+        if other_sol is not None:
+            _, other_dist_m, _ = other_sol
+            other_rounded = max(1, round(other_dist_m))
+            other_mins = max(1, round(other_dist_m / other_speed))
+            alternate_modes[other_mode] = {
+                "distance_text": _format_distance(other_rounded),
+                "duration_text": f"{other_mins} min" if other_mins == 1 else f"{other_mins} mins",
+                "distance_meters": other_rounded,
+                "duration_seconds": round((other_dist_m / other_speed) * 60),
+            }
+        result["alternate_modes"] = alternate_modes
+
+    with _CACHE_LOCK:
+        _ROUTE_CACHE[cache_key] = result
+        _ROUTE_CACHE.move_to_end(cache_key)
+        while len(_ROUTE_CACHE) > _ROUTE_CACHE_MAX:
+            _ROUTE_CACHE.popitem(last=False)
+
+    return dict(result)
 
 
 def _fallback_route(origin: dict, destination: dict, reason: str, mode: str = "walking") -> dict:

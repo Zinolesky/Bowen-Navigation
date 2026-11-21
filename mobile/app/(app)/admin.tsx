@@ -1,4 +1,5 @@
-import { Plus, Save, Trash2 } from "lucide-react-native";
+import * as Location from "expo-location";
+import { LocateFixed, Plus, Save, Trash2 } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,17 +10,19 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { createPoi, deletePoi, featureToPoi, getCategories, getPois, updatePoi } from "@/api";
+import { createPoi, deletePoi, updatePoi } from "@/api";
 import { useAuth } from "@/auth";
+import { useCampusData } from "@/campusStore";
 import { MarkerBadge } from "@/components/MarkerBadge";
 import { colors } from "@/theme";
-import type { Category, Poi, PoiProperties } from "@/types";
+import type { Poi } from "@/types";
 
 type FormState = {
   id?: number;
@@ -30,8 +33,9 @@ type FormState = {
   longitude: string;
   category_id?: number;
   building_id?: number | null;
-  google_place_id?: string;
+  google_place_id: string;
   icon_identifier: string;
+  is_active: boolean;
 };
 
 const emptyForm: FormState = {
@@ -41,15 +45,15 @@ const emptyForm: FormState = {
   latitude: "7.621500",
   longitude: "4.199000",
   google_place_id: "",
-  icon_identifier: "map-pin"
+  icon_identifier: "map-pin",
+  is_active: true
 };
 
 export default function AdminScreen() {
   const { user, signOut } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const { categories, pois, loading, refreshCampus } = useCampusData();
   const [saving, setSaving] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [pois, setPois] = useState<Poi[]>([]);
+  const [locatingGps, setLocatingGps] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
 
   const selectedCategory = useMemo(
@@ -57,31 +61,15 @@ export default function AdminScreen() {
     [categories, form.category_id]
   );
 
-  async function load() {
-    setLoading(true);
-    try {
-      const [categoryData, poiData] = await Promise.all([getCategories(), getPois()]);
-      setCategories(categoryData);
-      setPois(
-        poiData.features.map((feature) =>
-          featureToPoi(feature as { id?: number; geometry: { coordinates: number[] }; properties: PoiProperties })
-        )
-      );
+  useEffect(() => {
+    if (categories.length > 0 && !form.category_id) {
       setForm((current) => ({
         ...current,
-        category_id: current.category_id || categoryData[0]?.id,
-        icon_identifier: current.icon_identifier || categoryData[0]?.icon_identifier || "map-pin"
+        category_id: current.category_id || categories[0]?.id,
+        icon_identifier: current.icon_identifier || categories[0]?.icon_identifier || "map-pin"
       }));
-    } catch {
-      Alert.alert("Admin unavailable", "Check the API connection and try again.");
-    } finally {
-      setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
+  }, [categories, form.category_id]);
 
   if (!user?.is_staff_admin) {
     return (
@@ -105,7 +93,8 @@ export default function AdminScreen() {
       category_id: poi.category.id,
       building_id: poi.building?.id ?? null,
       google_place_id: poi.google_place_id || "",
-      icon_identifier: poi.icon_identifier || poi.category.icon_identifier
+      icon_identifier: poi.icon_identifier || poi.category.icon_identifier,
+      is_active: poi.is_active
     });
   }
 
@@ -115,6 +104,27 @@ export default function AdminScreen() {
       category_id: categories[0]?.id,
       icon_identifier: categories[0]?.icon_identifier || "map-pin"
     });
+  }
+
+  async function fillCurrentGps() {
+    setLocatingGps(true);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== "granted") {
+        Alert.alert("Permission required", "Allow location permission to fill your GPS coordinates.");
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setForm((current) => ({
+        ...current,
+        latitude: pos.coords.latitude.toFixed(6),
+        longitude: pos.coords.longitude.toFixed(6)
+      }));
+    } catch {
+      Alert.alert("GPS unavailable", "Could not fetch current device coordinates.");
+    } finally {
+      setLocatingGps(false);
+    }
   }
 
   async function savePoi() {
@@ -148,8 +158,8 @@ export default function AdminScreen() {
         latitude,
         longitude,
         icon_identifier: form.icon_identifier || selectedCategory?.icon_identifier || "map-pin",
-        google_place_id: form.google_place_id ?? "",
-        is_active: true
+        google_place_id: form.google_place_id.trim(),
+        is_active: form.is_active
       };
 
       if (form.id) {
@@ -158,7 +168,7 @@ export default function AdminScreen() {
         await createPoi(payload);
       }
       resetForm();
-      await load();
+      await refreshCampus(true);
     } catch {
       Alert.alert("Save failed", "The POI could not be saved.");
     } finally {
@@ -178,7 +188,7 @@ export default function AdminScreen() {
             if (form.id === poi.id) {
               resetForm();
             }
-            await load();
+            await refreshCampus(true);
           } catch {
             Alert.alert("Delete failed", "The POI could not be deleted.");
           }
@@ -201,7 +211,7 @@ export default function AdminScreen() {
         </View>
 
         <FlatList
-          data={loading ? [] : pois}
+          data={loading && pois.length === 0 ? [] : pois}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.poiList}
           ListHeaderComponent={
@@ -235,6 +245,16 @@ export default function AdminScreen() {
                 placeholderTextColor="#8A9691"
               />
 
+              <Text style={styles.label}>Google Place ID (optional)</Text>
+              <TextInput
+                value={form.google_place_id}
+                onChangeText={(google_place_id) => setForm((current) => ({ ...current, google_place_id }))}
+                style={styles.input}
+                placeholder="e.g. ChIJ..."
+                placeholderTextColor="#8A9691"
+                autoCapitalize="none"
+              />
+
               <Text style={styles.label}>Category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
                 {categories.map((category) => {
@@ -261,6 +281,20 @@ export default function AdminScreen() {
                 })}
               </ScrollView>
 
+              <View style={styles.coordHeader}>
+                <Text style={styles.label}>Coordinates</Text>
+                <Pressable onPress={fillCurrentGps} disabled={locatingGps} style={styles.gpsFillBtn}>
+                  {locatingGps ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <LocateFixed size={14} color={colors.primary} />
+                      <Text style={styles.gpsFillText}>Use My GPS</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+
               <View style={styles.coordinateRow}>
                 <View style={styles.coordinateInput}>
                   <Text style={styles.label}>Latitude</Text>
@@ -282,6 +316,15 @@ export default function AdminScreen() {
                 </View>
               </View>
 
+              <View style={styles.activeRow}>
+                <Text style={styles.label}>Visible on campus map</Text>
+                <Switch
+                  value={form.is_active}
+                  onValueChange={(is_active) => setForm((current) => ({ ...current, is_active }))}
+                  trackColor={{ false: colors.line, true: colors.primary }}
+                />
+              </View>
+
               <View style={styles.formActions}>
                 <Pressable onPress={savePoi} disabled={saving} style={styles.saveButton}>
                   {saving ? <ActivityIndicator color="#FFFFFF" /> : <Save size={17} color="#FFFFFF" />}
@@ -292,7 +335,7 @@ export default function AdminScreen() {
                 </Pressable>
               </View>
 
-              {loading && (
+              {loading && pois.length === 0 && (
                 <View style={styles.loading}>
                   <ActivityIndicator color={colors.primary} />
                 </View>
@@ -422,12 +465,40 @@ const styles = StyleSheet.create({
   categoryTextActive: {
     color: "#FFFFFF"
   },
+  coordHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6
+  },
+  gpsFillBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "#F0FDF4"
+  },
+  gpsFillText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
+  },
   coordinateRow: {
     flexDirection: "row",
     gap: 10
   },
   coordinateInput: {
     flex: 1
+  },
+  activeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12
   },
   formActions: {
     flexDirection: "row",

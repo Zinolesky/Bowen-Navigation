@@ -5,12 +5,13 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies for GeoDjango
+# Install system dependencies for GeoDjango and TrueType marker rendering
 RUN apt-get update && apt-get install -y \
     binutils \
     libproj-dev \
     gdal-bin \
     python3-gdal \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Set work directory

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
-import { Search, X } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
+import { RefreshCw, Search, X } from "lucide-react-native";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,37 +13,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { featureToPoi, getCategories, getPois } from "@/api";
+import { useCampusData } from "@/campusStore";
 import { MarkerBadge } from "@/components/MarkerBadge";
 import { colors } from "@/theme";
-import type { Category, Poi, PoiProperties } from "@/types";
+import type { Category, Poi } from "@/types";
 
 export default function SearchScreen() {
+  const { categories, pois, loading, refreshCampus } = useCampusData();
   const [query, setQuery] = useState("");
-  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
-  const [pois, setPois] = useState<Poi[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [categoryData, poiData] = await Promise.all([getCategories(), getPois()]);
-        setCategories(categoryData);
-        setPois(
-          poiData.features.map((feature) =>
-            featureToPoi(feature as { geometry: { coordinates: number[] }; properties: PoiProperties })
-          )
-        );
-      } catch (error) {
-        Alert.alert("Search unavailable", "Check the API connection and try again.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -58,16 +37,31 @@ export default function SearchScreen() {
     });
   }, [pois, query, selectedCategory]);
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await refreshCampus(true);
+    } catch {
+      Alert.alert("Search unavailable", "Check the API connection and try again.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   function openPoi(poi: Poi) {
     router.push({ pathname: "/(app)/map", params: { poi: String(poi.id), t: String(Date.now()) } });
   }
-
 
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Search campus</Text>
-        <Text style={styles.count}>{results.length} places</Text>
+        <View style={styles.headerRight}>
+          <Text style={styles.count}>{results.length} places</Text>
+          <Pressable onPress={handleRefresh} style={styles.refreshBtn} hitSlop={8}>
+            <RefreshCw size={17} color={colors.primary} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.searchBox}>
@@ -107,13 +101,15 @@ export default function SearchScreen() {
         }}
       />
 
-      {loading ? (
+      {loading && pois.length === 0 ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
         <FlatList
           data={results}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -163,10 +159,24 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
   count: {
     color: colors.muted,
-    fontWeight: "800",
-    paddingBottom: 4
+    fontWeight: "800"
+  },
+  refreshBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center"
   },
   searchBox: {
     marginHorizontal: 18,

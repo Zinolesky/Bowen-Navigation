@@ -28,11 +28,11 @@ npm install
 Pop-Location
 
 Write-Host ""
-Write-Host "Done! The backend is already running on port 8000 via Docker." -ForegroundColor Green
+Write-Host "Done! The backend is running on port 8001 (PostGIS on 5434) via Docker." -ForegroundColor Green
 Write-Host "To start the mobile app, run in a terminal:" -ForegroundColor White
 Write-Host "  cd mobile" -ForegroundColor White
 Write-Host "  npx expo start" -ForegroundColor White
 Write-Host ""
-Write-Host "Default student login - matric: BU22CSC1136" -ForegroundColor Gray
-Write-Host "Default admin   login - matric: ADMIN001" -ForegroundColor Gray
+Write-Host "Default student login - full name: Taigbenu Efezino | matric: BU22CSC1136" -ForegroundColor Gray
+Write-Host "Default admin   login - full name: Campus Admin     | matric: ADMIN001 | password: ADMIN001" -ForegroundColor Gray
 Write-Host ""

@@ -6,10 +6,14 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://127.0.0.1:8000/api"
+      "value": "http://127.0.0.1:8001/api"
     },
     {
       "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "photo_ref",
       "value": ""
     }
   ],
@@ -22,7 +26,7 @@
       }
     },
     {
-      "name": "Login",
+      "name": "Login (Student)",
       "event": [
         {
           "listen": "test",
@@ -48,6 +52,48 @@
           "raw": "{\n  \"full_name\": \"Taigbenu Efezino\",\n  \"matric_number\": \"BU22CSC1136\"\n}"
         },
         "url": "{{base_url}}/auth/login/"
+      }
+    },
+    {
+      "name": "Login (Staff Admin)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const data = pm.response.json();",
+              "pm.collectionVariables.set('access_token', data.access);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"full_name\": \"Campus Admin\",\n  \"matric_number\": \"ADMIN001\",\n  \"password\": \"ADMIN001\"\n}"
+        },
+        "url": "{{base_url}}/auth/login/"
+      }
+    },
+    {
+      "name": "Bootstrap (Single Roundtrip)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/bootstrap/?include_sprites=true"
       }
     },
     {
@@ -105,11 +151,44 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"origin\": { \"latitude\": 7.6218, \"longitude\": 4.18733 },\n  \"destination\": { \"latitude\": 7.62408, \"longitude\": 4.18918 }\n}"
+          "raw": "{\n  \"origin\": { \"latitude\": 7.62105, \"longitude\": 4.19066 },\n  \"destination\": { \"latitude\": 7.62154, \"longitude\": 4.19172 },\n  \"mode\": \"walking\",\n  \"include_alternate\": true\n}"
         },
         "url": "{{base_url}}/directions/"
+      }
+    },
+    {
+      "name": "Place Details",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"place_id\": \"ChIJ...\"\n}"
+        },
+        "url": "{{base_url}}/places/details/"
+      }
+    },
+    {
+      "name": "Place Photo Proxy",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/places/photo/?ref={{photo_ref}}&maxwidth=800"
       }
     }
   ]
 }
-

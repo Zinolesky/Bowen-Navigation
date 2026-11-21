@@ -1,14 +1,20 @@
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { login as apiLogin, setAccessToken, setOnUnauthorized, setRefreshToken } from "./api";
+import {
+  login as apiLogin,
+  setAccessToken,
+  setOnTokenRefreshed,
+  setOnUnauthorized,
+  setRefreshToken
+} from "./api";
 import type { User } from "./types";
 
 type AuthContextValue = {
   isLoading: boolean;
   user?: User;
   accessToken?: string;
-  signIn: (fullName: string, matricNumber: string) => Promise<void>;
+  signIn: (fullName: string, matricNumber: string, password?: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -39,7 +45,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOnUnauthorized(() => {
       signOut();
     });
-    return () => setOnUnauthorized(undefined);
+    setOnTokenRefreshed((newAccessToken: string) => {
+      setAccessTokenState(newAccessToken);
+      SecureStore.setItemAsync(ACCESS_KEY, newAccessToken).catch(() => {});
+    });
+    return () => {
+      setOnUnauthorized(undefined);
+      setOnTokenRefreshed(undefined);
+    };
   }, [signOut]);
 
   useEffect(() => {
@@ -71,8 +84,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       user,
       accessToken,
-      async signIn(fullName, matricNumber) {
-        const result = await apiLogin(fullName, matricNumber);
+      async signIn(fullName, matricNumber, password) {
+        const result = await apiLogin(fullName, matricNumber, password);
         setAccessToken(result.access);
         setRefreshToken(result.refresh);
         setAccessTokenState(result.access);

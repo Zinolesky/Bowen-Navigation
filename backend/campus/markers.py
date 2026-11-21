@@ -1,9 +1,26 @@
 import base64
-import io
 from functools import lru_cache
+import io
+import os
 from PIL import Image, ImageDraw, ImageFont
 
-FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT_CANDIDATES = (
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    r"C:\Windows\Fonts\segoeuib.ttf",
+    r"C:\Windows\Fonts\arialbd.ttf",
+)
+
+
+@lru_cache(maxsize=32)
+def _get_bold_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    for path in FONT_CANDIDATES:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, font_size)
+            except OSError:
+                continue
+    return ImageFont.load_default()
 
 
 def _hex_to_rgba(hex_color: str, alpha: int = 255) -> tuple[int, int, int, int]:
@@ -226,10 +243,7 @@ def render_poi_marker_data_uri(
         badge_radius = 21 * ss
         font_size = 22 * ss
 
-    try:
-        font = ImageFont.truetype(FONT_BOLD_PATH, font_size)
-    except OSError:
-        font = ImageFont.load_default()
+    font = _get_bold_font(font_size)
 
     dummy_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
     dummy_draw = ImageDraw.Draw(dummy_img)
@@ -326,10 +340,7 @@ def render_route_callout_data_uri(duration_text: str, mode: str = "walking") -> 
     bg_color = (29, 78, 216, 255) if mode != "driving" else (234, 88, 12, 255)
 
     font_size = 24 * ss
-    try:
-        font = ImageFont.truetype(FONT_BOLD_PATH, font_size)
-    except OSError:
-        font = ImageFont.load_default()
+    font = _get_bold_font(font_size)
 
     dummy_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
     dummy_draw = ImageDraw.Draw(dummy_img)

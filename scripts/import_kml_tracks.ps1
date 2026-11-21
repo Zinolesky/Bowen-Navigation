@@ -3,7 +3,7 @@ param(
     [string]$DbName = "bowen_navigator",
     [string]$DbUser = "bowen",
     [string]$DbHost = "127.0.0.1",
-    [string]$DbPort = "5432"
+    [string]$DbPort = "5434"
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,4 +24,3 @@ ogr2ogr `
     -t_srs EPSG:4326
 
 Write-Host "Imported KML tracks into campus_track_import."
-

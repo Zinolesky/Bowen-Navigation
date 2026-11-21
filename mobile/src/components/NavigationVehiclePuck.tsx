@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { Navigation } from "lucide-react-native";
+import { Navigation2 } from "lucide-react-native";
 import type { TravelMode } from "@/types";
 
 interface NavigationVehiclePuckProps {
@@ -41,7 +41,7 @@ export function NavigationVehiclePuck({ mode }: NavigationVehiclePuckProps) {
     <View style={styles.puckContainer}>
       <View style={styles.puckHalo} />
       <View style={styles.puckCircle}>
-        <Navigation size={18} color="#FFFFFF" fill="#FFFFFF" style={styles.arrowOffset} />
+        <Navigation2 size={18} color="#FFFFFF" fill="#FFFFFF" style={styles.arrowOffset} />
       </View>
     </View>
   );

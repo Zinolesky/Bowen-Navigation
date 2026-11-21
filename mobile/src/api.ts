@@ -2,6 +2,7 @@ import axios from "axios";
 import Constants from "expo-constants";
 
 import type {
+  CampusBootstrapResponse,
   Category,
   DirectionsResponse,
   GeoFeatureCollection,
@@ -41,6 +42,7 @@ export const api = axios.create({
 
 let refreshTokenValue: string | undefined;
 let onUnauthorizedCallback: (() => void) | undefined;
+let onTokenRefreshedCallback: ((newAccessToken: string) => void) | undefined;
 
 export function setAccessToken(token?: string) {
   if (token) {
@@ -56,6 +58,10 @@ export function setRefreshToken(token?: string) {
 
 export function setOnUnauthorized(callback?: () => void) {
   onUnauthorizedCallback = callback;
+}
+
+export function setOnTokenRefreshed(callback?: (newAccessToken: string) => void) {
+  onTokenRefreshedCallback = callback;
 }
 
 api.interceptors.response.use(
@@ -77,6 +83,7 @@ api.interceptors.response.use(
           });
           if (data?.access) {
             setAccessToken(data.access);
+            onTokenRefreshedCallback?.(data.access);
             originalRequest.headers.Authorization = `Bearer ${data.access}`;
             return api(originalRequest);
           }
@@ -90,11 +97,15 @@ api.interceptors.response.use(
   }
 );
 
-export async function login(full_name: string, matric_number: string) {
-  const { data } = await api.post<{ access: string; refresh: string; user: User }>("/auth/login/", {
+export async function login(full_name: string, matric_number: string, password?: string) {
+  const payload: { full_name: string; matric_number: string; password?: string } = {
     full_name: full_name.trim(),
     matric_number: matric_number.trim().toUpperCase()
-  });
+  };
+  if (password && password.length > 0) {
+    payload.password = password;
+  }
+  const { data } = await api.post<{ access: string; refresh: string; user: User }>("/auth/login/", payload);
   return data;
 }
 
@@ -103,8 +114,12 @@ export async function getCategories() {
   return data;
 }
 
-export async function getPois(params?: { search?: string; category?: string }) {
-  const { data } = await api.get<GeoFeatureCollection<PoiProperties>>("/pois/", { params });
+export async function getPois(params?: { search?: string; category?: string; include_sprites?: boolean }) {
+  const queryParams: Record<string, string> = {};
+  if (params?.search) queryParams.search = params.search;
+  if (params?.category) queryParams.category = params.category;
+  if (params?.include_sprites) queryParams.include_sprites = "true";
+  const { data } = await api.get<GeoFeatureCollection<PoiProperties>>("/pois/", { params: queryParams });
   return data;
 }
 
@@ -113,10 +128,35 @@ export async function getTracks(params?: { track_type?: string }) {
   return data;
 }
 
+export async function getCampusBootstrap(options?: {
+  includeSprites?: boolean;
+  etag?: string;
+}): Promise<
+  | { notModified: true; etag?: string }
+  | { notModified: false; etag?: string; data: CampusBootstrapResponse }
+> {
+  const includeSprites = options?.includeSprites ?? true;
+  const response = await api.get<CampusBootstrapResponse>("/bootstrap/", {
+    params: includeSprites ? { include_sprites: "true" } : undefined,
+    headers: options?.etag ? { "If-None-Match": options.etag } : undefined,
+    validateStatus: (s) => (s >= 200 && s < 300) || s === 304
+  });
+
+  const nextEtag = (response.headers?.etag || (response.headers as any)?.get?.("etag") || options?.etag) as
+    | string
+    | undefined;
+
+  if (response.status === 304) {
+    return { notModified: true, etag: nextEtag };
+  }
+  return { notModified: false, etag: nextEtag, data: response.data };
+}
+
 export async function requestDirections(payload: {
   origin: { latitude: number; longitude: number };
   destination: { latitude: number; longitude: number };
   mode?: TravelMode;
+  include_alternate?: boolean;
 }) {
   const { data } = await api.post<DirectionsResponse>("/directions/", payload);
   return data;
@@ -125,6 +165,10 @@ export async function requestDirections(payload: {
 export async function getPlaceDetails(place_id: string) {
   const { data } = await api.post("/places/details/", { place_id });
   return data;
+}
+
+export function buildPlacePhotoUrl(photoRef: string, maxWidth: number = 800): string {
+  return `${API_URL}/places/photo/?ref=${encodeURIComponent(photoRef)}&maxwidth=${maxWidth}`;
 }
 
 export type PoiWriteInput = Partial<Poi> & {
@@ -148,7 +192,11 @@ export async function deletePoi(id: number) {
   await api.delete(`/pois/${id}/`);
 }
 
-export function featureToPoi(feature: { id?: number; geometry: { coordinates: number[] }; properties: PoiProperties }): Poi {
+export function featureToPoi(feature: {
+  id?: number;
+  geometry: { coordinates: number[] };
+  properties: PoiProperties;
+}): Poi {
   const [longitude, latitude] = feature.geometry.coordinates;
   return {
     ...feature.properties,

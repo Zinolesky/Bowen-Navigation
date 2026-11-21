@@ -78,20 +78,38 @@ class PointOfInterestGeoSerializer(GeoFeatureModelSerializer):
         icon = obj.icon_identifier or (getattr(obj.category, "icon_identifier", "building-2") if obj.category_id else "building-2")
         return render_poi_marker_data_uri(obj.name, color, icon, variant)
 
+    def _sprites_enabled(self) -> bool:
+        return bool(self.context.get("include_sprites", False))
+
     def get_marker_icon_default(self, obj):
-        return self._get_marker_tuple(obj, "default")[0]
+        return self._get_marker_tuple(obj, "default")[0] if self._sprites_enabled() else None
 
     def get_marker_icon_compact(self, obj):
-        return self._get_marker_tuple(obj, "compact")[0]
+        return self._get_marker_tuple(obj, "compact")[0] if self._sprites_enabled() else None
 
     def get_marker_icon_selected(self, obj):
-        return self._get_marker_tuple(obj, "selected")[0]
+        return self._get_marker_tuple(obj, "selected")[0] if self._sprites_enabled() else None
 
     def get_marker_icon_destination(self, obj):
-        return self._get_marker_tuple(obj, "destination")[0]
+        return self._get_marker_tuple(obj, "destination")[0] if self._sprites_enabled() else None
 
     def get_marker_anchor_x(self, obj):
-        return self._get_marker_tuple(obj, "default")[1]
+        return self._get_marker_tuple(obj, "default")[1] if self._sprites_enabled() else None
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        if not self._sprites_enabled():
+            props = rep.get("properties")
+            if isinstance(props, dict):
+                for key in (
+                    "marker_icon_default",
+                    "marker_icon_compact",
+                    "marker_icon_selected",
+                    "marker_icon_destination",
+                    "marker_anchor_x",
+                ):
+                    props.pop(key, None)
+        return rep
 
 
 class PointOfInterestWriteSerializer(serializers.ModelSerializer):
@@ -161,18 +179,26 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=150)
     matric_number = serializers.CharField(max_length=32)
+    password = serializers.CharField(max_length=128, required=False, allow_blank=True, write_only=True)
 
     def validate(self, attrs):
         matric_number = attrs["matric_number"].upper().strip()
         full_name = " ".join(attrs["full_name"].split()).lower()
+        password = attrs.get("password") or ""
+        invalid_msg = "Invalid credentials. Check your full name and matriculation number."
 
         try:
             user = User.objects.get(matric_number__iexact=matric_number, is_active=True)
         except User.DoesNotExist as exc:
-            raise serializers.ValidationError("Invalid matriculation number.") from exc
+            raise serializers.ValidationError(invalid_msg) from exc
 
-        if user.full_name and user.full_name.lower() != full_name:
-            raise serializers.ValidationError("Full name does not match this matriculation number.")
+        stored_name = " ".join((user.full_name or "").split()).lower()
+        if stored_name and stored_name != full_name:
+            raise serializers.ValidationError(invalid_msg)
+
+        if user.is_staff_admin or user.is_staff:
+            if not password or not user.check_password(password):
+                raise serializers.ValidationError("Staff admin accounts require a valid password.")
 
         attrs["user"] = user
         return attrs

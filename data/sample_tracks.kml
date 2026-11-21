@@ -3,17 +3,17 @@
   <Document>
     <name>Bowen Navigator Sample Tracks</name>
     <Placemark>
-      <name>Main Gate to Worship Centre</name>
+      <name>Bowen Campus Main Road (Gate to Academic Core)</name>
       <LineString>
         <tessellate>1</tessellate>
         <coordinates>
-          4.18733,7.62180,0
-          4.18805,7.62222,0
-          4.18902,7.62252,0
-          4.19003,7.62295,0
+          4.19066,7.62105,0
+          4.19069,7.62097,0
+          4.19100,7.62115,0
+          4.19134,7.62134,0
+          4.19172,7.62154,0
         </coordinates>
       </LineString>
     </Placemark>
   </Document>
 </kml>
-

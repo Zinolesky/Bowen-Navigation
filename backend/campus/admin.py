@@ -1,6 +1,10 @@
 from django.contrib import admin
 from leaflet.admin import LeafletGeoAdmin
+import logging
+
 from .models import Building, Category, PointOfInterest, Track
+
+logger = logging.getLogger(__name__)
 
 
 @admin.register(Category)
@@ -78,7 +82,7 @@ def _sync_tracks_to_seed_file():
         payload["tracks"] = tracks_out
         seed_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     except Exception:
-        pass
+        logger.warning("Failed to sync tracks back to campus_seed.json", exc_info=True)
 
 
 @admin.register(Track)

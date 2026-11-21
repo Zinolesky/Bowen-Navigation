@@ -88,6 +88,13 @@ export type RouteStep = {
   polyline?: string;
 };
 
+export type ModeEstimate = {
+  distance_text: string;
+  duration_text: string;
+  distance_meters: number;
+  duration_seconds: number;
+};
+
 export type DirectionsResponse = {
   provider: "google" | "local-fallback" | "bowen-routing";
   mode?: TravelMode;
@@ -100,4 +107,19 @@ export type DirectionsResponse = {
   duration_badge_uri?: string;
   overview_polyline: string;
   steps: RouteStep[];
+  alternate_modes?: Partial<Record<TravelMode, ModeEstimate>>;
+};
+
+export type PlacePhoto = {
+  photo_reference?: string;
+  proxy_path?: string;
+  width?: number;
+  height?: number;
+};
+
+export type CampusBootstrapResponse = {
+  version: number;
+  categories: Category[];
+  pois: GeoFeatureCollection<PoiProperties>;
+  tracks: GeoFeatureCollection<TrackProperties>;
 };

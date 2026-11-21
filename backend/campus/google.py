@@ -1,14 +1,7 @@
 from __future__ import annotations
 
-import html
 import math
-import re
 from typing import Iterable
-
-
-def strip_html(value: str) -> str:
-    text = re.sub(r"<[^>]+>", "", value or "")
-    return html.unescape(text).strip()
 
 
 def haversine_meters(origin: dict, destination: dict) -> int:
@@ -39,42 +32,6 @@ def encode_polyline(points: Iterable[tuple[float, float]]) -> str:
         previous_lng = lng
 
     return "".join(result)
-
-
-def normalize_google_directions(payload: dict) -> dict:
-    routes = payload.get("routes", [])
-    if not routes:
-        return {
-            "provider": "google",
-            "status": payload.get("status", "ZERO_RESULTS"),
-            "overview_polyline": "",
-            "steps": [],
-            "raw": payload,
-        }
-
-    route = routes[0]
-    leg = (route.get("legs") or [{}])[0]
-    steps = []
-    for step in leg.get("steps", []):
-        steps.append(
-            {
-                "instruction": strip_html(step.get("html_instructions", "")),
-                "distance_text": step.get("distance", {}).get("text", ""),
-                "duration_text": step.get("duration", {}).get("text", ""),
-                "polyline": step.get("polyline", {}).get("points", ""),
-            }
-        )
-
-    return {
-        "provider": "google",
-        "status": payload.get("status", "OK"),
-        "summary": route.get("summary", ""),
-        "distance_text": leg.get("distance", {}).get("text", ""),
-        "duration_text": leg.get("duration", {}).get("text", ""),
-        "overview_polyline": route.get("overview_polyline", {}).get("points", ""),
-        "steps": steps,
-        "raw": payload,
-    }
 
 
 def fallback_directions(origin: dict, destination: dict, mode: str = "walking") -> dict:
