@@ -1,12 +1,40 @@
+import re
+
+from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
+from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from django.contrib.auth import get_user_model
 from .models import Building, Category, PointOfInterest, Track
 
 User = get_user_model()
+_MATRIC_RE = re.compile(r"^[A-Z0-9/_-]{4,32}$")
+
+
+def build_token_response(user) -> dict:
+    refresh = RefreshToken.for_user(user)
+    refresh["full_name"] = user.full_name
+    refresh["matric_number"] = user.matric_number
+    refresh["is_staff_admin"] = user.is_staff_admin
+
+    return {
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+        "user": UserProfileSerializer(user).data,
+    }
+
+
+def _unique_building_slug(name: str) -> str:
+    base = slugify(name) or "campus-building"
+    candidate = base[:160]
+    counter = 2
+    while Building.objects.filter(slug=candidate).exists():
+        suffix = f"-{counter}"
+        candidate = f"{base[: 160 - len(suffix)]}{suffix}"
+        counter += 1
+    return candidate
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -75,7 +103,9 @@ class PointOfInterestGeoSerializer(GeoFeatureModelSerializer):
         from .markers import render_poi_marker_data_uri
 
         color = getattr(obj.category, "color", "#2563EB") if obj.category_id else "#2563EB"
-        icon = obj.icon_identifier or (getattr(obj.category, "icon_identifier", "building-2") if obj.category_id else "building-2")
+        icon = obj.icon_identifier or (
+            getattr(obj.category, "icon_identifier", "building-2") if obj.category_id else "building-2"
+        )
         return render_poi_marker_data_uri(obj.name, color, icon, variant)
 
     def _sprites_enabled(self) -> bool:
@@ -146,10 +176,38 @@ class PointOfInterestWriteSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        return super().create(self._set_location(validated_data))
+        attrs = self._set_location(validated_data)
+        location = attrs.get("location")
+        if attrs.get("building") is None and location is not None and attrs.get("name"):
+            building = Building.objects.filter(name__iexact=attrs["name"]).first()
+            if building is None:
+                building = Building.objects.create(
+                    name=attrs["name"],
+                    slug=_unique_building_slug(attrs["name"]),
+                    description=attrs.get("description", ""),
+                    location=location,
+                )
+            elif PointOfInterest.objects.filter(building=building).count() == 0:
+                building.location = location
+                building.save(update_fields=["location", "updated_at"])
+            attrs["building"] = building
+        return super().create(attrs)
 
     def update(self, instance, validated_data):
-        return super().update(instance, self._set_location(validated_data))
+        attrs = self._set_location(validated_data)
+        new_location = attrs.get("location")
+        updated = super().update(instance, attrs)
+        if (
+            new_location is not None
+            and updated.building_id
+            and PointOfInterest.objects.filter(building_id=updated.building_id)
+            .exclude(pk=updated.pk)
+            .count()
+            == 0
+        ):
+            updated.building.location = new_location
+            updated.building.save(update_fields=["location", "updated_at"])
+        return updated
 
     def to_representation(self, instance):
         return PointOfInterestGeoSerializer(instance, context=self.context).data
@@ -169,50 +227,68 @@ class TrackGeoSerializer(GeoFeatureModelSerializer):
         return resolve_track_type(obj)
 
 
-
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "full_name", "matric_number", "is_staff_admin")
+        fields = ("id", "full_name", "matric_number", "email", "is_staff_admin")
+
+
+class RegisterSerializer(serializers.Serializer):
+    full_name = serializers.CharField(min_length=2, max_length=150)
+    matric_number = serializers.CharField(min_length=4, max_length=32)
+    email = serializers.EmailField(required=False, allow_blank=True, default="")
+    password = serializers.CharField(min_length=6, max_length=128, write_only=True)
+
+    def validate_full_name(self, value: str) -> str:
+        cleaned = " ".join(value.split())
+        if len(cleaned) < 2:
+            raise serializers.ValidationError("Enter your full name.")
+        return cleaned
+
+    def validate_matric_number(self, value: str) -> str:
+        normalized = value.upper().strip()
+        if not _MATRIC_RE.fullmatch(normalized):
+            raise serializers.ValidationError(
+                "Matriculation number must be 4-32 characters using letters, digits, '/', '-', or '_'."
+            )
+        if User.objects.filter(matric_number__iexact=normalized).exists():
+            raise serializers.ValidationError("An account with this matriculation number already exists.")
+        return normalized
+
+    def create(self, validated_data):
+        return User.objects.create_user(
+            matric_number=validated_data["matric_number"],
+            full_name=validated_data["full_name"],
+            email=(validated_data.get("email") or "").strip().lower(),
+            password=validated_data["password"],
+            is_staff_admin=False,
+            is_active=True,
+        )
+
+    def create_token_response(self):
+        return build_token_response(self.instance)
 
 
 class LoginSerializer(serializers.Serializer):
-    full_name = serializers.CharField(max_length=150)
     matric_number = serializers.CharField(max_length=32)
-    password = serializers.CharField(max_length=128, required=False, allow_blank=True, write_only=True)
+    password = serializers.CharField(max_length=128, write_only=True)
+    full_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
 
     def validate(self, attrs):
         matric_number = attrs["matric_number"].upper().strip()
-        full_name = " ".join(attrs["full_name"].split()).lower()
         password = attrs.get("password") or ""
-        invalid_msg = "Invalid credentials. Check your full name and matriculation number."
+        invalid_msg = "Invalid matriculation/staff ID or password."
 
         try:
             user = User.objects.get(matric_number__iexact=matric_number, is_active=True)
         except User.DoesNotExist as exc:
             raise serializers.ValidationError(invalid_msg) from exc
 
-        stored_name = " ".join((user.full_name or "").split()).lower()
-        if stored_name and stored_name != full_name:
+        if not password or not user.check_password(password):
             raise serializers.ValidationError(invalid_msg)
-
-        if user.is_staff_admin or user.is_staff:
-            if not password or not user.check_password(password):
-                raise serializers.ValidationError("Staff admin accounts require a valid password.")
 
         attrs["user"] = user
         return attrs
 
     def create_token_response(self):
-        user = self.validated_data["user"]
-        refresh = RefreshToken.for_user(user)
-        refresh["full_name"] = user.full_name
-        refresh["matric_number"] = user.matric_number
-        refresh["is_staff_admin"] = user.is_staff_admin
-
-        return {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "user": UserProfileSerializer(user).data,
-        }
-
+        return build_token_response(self.validated_data["user"])

@@ -1,43 +1,28 @@
 # Project Mapping
 
-This implementation follows and extends the tools and architecture specified in the project report.
+Enterprise campus navigation platform for Bowen University extending the capstone specification with offline resilience, multi-worker Redis coherence, adaptive theming, and CI automation.
 
-## Backend Tools
+## Backend Architecture
 
-- Python 3: Django project source under `backend/`.
-- Django 4.x: project package `bowen_navigator`, served via Gunicorn + WhiteNoise with GZip compression.
-- Django REST Framework: JWT-protected viewsets and endpoints in `backend/campus/`.
-- JWT: `djangorestframework-simplejwt` login and refresh flow at `/api/auth/login/` and `/api/auth/refresh/`.
-- PostgreSQL and PostGIS: GeoDjango database engine (`django.contrib.gis.db.backends.postgis`) with persistent connection pooling (`CONN_MAX_AGE`).
-- GeoDjango: `PointField` for buildings/POIs and `LineStringField` (`geography=True, srid=4326`) for campus pathways.
-- `rest_framework_gis`: GeoJSON serializers for `/api/pois/`, `/api/tracks/`, and single-roundtrip `/api/bootstrap/`.
-- Custom Campus Routing Engine (`backend/campus/routing.py`): precompiled, thread-safe cached topological graph with X-intersection splitting, T-junction snapping, perpendicular edge projection, mode separation (`walking` vs `driving`), admissible A\* shortest-path search, LRU route cache, and `alternate_modes` ETA computation.
-- Server-Rendered Map Markers (`backend/campus/markers.py`): opt-in (`?include_sprites=true`) Pillow-rendered quantized PNG sprites and duration callouts cached via `@lru_cache`.
-- GDAL/ogr2ogr: helper script at `scripts/import_kml_tracks.ps1`.
-- Google Places API Proxy: authenticated `/api/places/details/` and `/api/places/photo/` endpoints with server-side caching (`GOOGLE_PLACES_API_KEY` stays strictly on the backend).
-- `django-leaflet` & pgAdmin: interactive map geometry editing in Django Admin + pgAdmin in `docker-compose.yml`.
-- Postman: collection at `docs/postman/Bowen_Navigator.postman_collection.json`.
+- **Django 4.2 + DRF**: Viewsets and endpoints in `backend/campus/`, served by multi-worker Gunicorn (`--workers 2 --threads 4`) + WhiteNoise with GZip compression.
+- **PostgreSQL + PostGIS**: GeoDjango `PointField` for buildings/POIs and `LineStringField` (`geography=True, srid=4326`) for 33 mapped pathways, with persistent connection pooling (`CONN_MAX_AGE=60`).
+- **Redis Multi-Worker Cache (`django.core.cache.backends.redis.RedisCache`)**: Shared API response caching, `ETag` versioning (`campus:data_version`), and cross-worker routing graph invalidation (`campus:routing_version`).
+- **Auth & Roster Governance**: Password-verified JWT login (`/api/auth/login/`), self-service student registration (`/api/auth/register/`), guest read-only browsing, and staff-admin CSV bulk student import (`/api/admin/import-students/` & `manage.py import_students_csv`).
+- **Security & Throttling**: DRF rate limiting (`anon`, `user`, `auth`, `places` in `backend/campus/throttles.py`), strict staff-only mutations (`IsStaffAdminOrReadOnly`, `IsStaffAdmin`), and server-only `GOOGLE_PLACES_API_KEY` proxy.
+- **Observability**: Deep readiness probe at `GET /api/health/` validating PostgreSQL + Redis latency, plus structured console logging.
+- **Topological Routing Engine (`backend/campus/routing.py`)**: Compiled X-intersection/T-junction graph, admissible A\* search, curve-bend turn suppression, short access-path merging, LRU route cache, and `alternate_modes`.
+- **Admin Seed Sync (`backend/campus/admin.py`)**: Interactive `django-leaflet` map editing for Tracks and POIs auto-synced to `data/campus_seed.json`.
 
-## Mobile Tools
+## Mobile Architecture
 
-- React Native: Expo application under `mobile/`.
-- Expo SDK 58: package target in `mobile/package.json`.
-- Expo Router: file-based screens under `mobile/app/`.
-- TypeScript: strict app source and pure geometry/navigation math helpers under `mobile/src/`.
-- Axios: API client in `mobile/src/api.ts` with automatic JWT refresh persisted back to `SecureStore`.
-- Shared Campus Store (`mobile/src/campusStore.tsx`): single-request `/api/bootstrap/` hydration with `ETag` / `304 Not Modified` validation and Place Details memory caching across Map, Search, and Admin tabs.
-- `react-native-maps` (Google Maps SDK via `mobile/app.config.ts`) + `@mapbox/polyline`: custom campus map styling, zoom-aware POI decluttering, parallel walkway filtering, and route overlays.
-- Expo Location & Expo Speech: 3-stage turn-by-turn navigation (`Place Details` -> `Route Overview` -> `Live Navigation` with spoken prompts, 3D tilted camera, off-route auto-rerouting, arrival detection, and off-campus Demo simulation).
-- EAS Build: APK build profile in `mobile/eas.json`.
+- **Expo SDK 58 + React Native + Expo Router**: Strict TypeScript codebase under `mobile/`.
+- **Offline-First Bootstrap & On-Device A\* Router**:
+  - `mobile/src/campusStorage.ts` persists `/api/bootstrap/` payloads on device storage via `expo-file-system` for instant startup and offline browsing/search.
+  - `mobile/src/offlineRouter.ts` compiles the campus track network on-device and serves pedestrian/driving routes and turn-by-turn steps offline whenever the backend is unreachable.
+- **Adaptive Light & Dark Theme (`mobile/src/theme.ts`, `mobile/src/mapStyle.ts`)**: System-aware UI palettes, Light/Dark Google Maps styling (`userInterfaceStyle`), contrast-tuned track layers, and generated `icon.png`, `adaptive-icon.png`, and `splash-icon.png` assets.
+- **3-Stage Turn-by-Turn Navigation**: `Place Details` -> `Route Overview` -> `Live Navigation` with upcoming-maneuver HUD (`LiveNavigationHud.tsx`), `expo-speech` voice prompts, off-route auto-rerouting, arrival detection, and off-campus Demo simulation.
 
-## Report Features Implemented
+## Seeded Campus Coverage
 
-- Student login with full name and matric number, plus password-verified staff admin login.
-- Strict JWT-protected campus API and role-based POI administration.
-- Categorised POI markers with collision-free zoom decluttering.
-- Campus-wide POI search by name, description, and category + searchable origin picker.
-- Pedestrian walkways and vehicle driveways as GeoJSON `LineString` tracks.
-- Custom mode-aware turn-by-turn walking & driving directions through the Django routing engine.
-- Google Places Details & Photo proxy protecting the backend API key.
-- In-app staff administration for POI create, edit, GPS autofill, and delete.
-- Seeded Bowen campus dataset (38 buildings/POIs, 19 tracks, 6 categories) and demo accounts.
+- 38 POIs & Buildings across 6 Categories.
+- 33 Pathways (`vehicle`, `pedestrian`, and `both`) covering main boulevards, courtyard walkways, and spur connectors to every campus building.

@@ -5,13 +5,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth";
 import { CampusDataProvider } from "@/campusStore";
-import { colors } from "@/theme";
+import { useAppTheme } from "@/theme";
 
 export default function AppTabs() {
-  const { isLoading, user } = useAuth();
+  const { isLoading, user, isGuest } = useAuth();
   const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
 
-  if (!isLoading && !user) {
+  if (!isLoading && !user && !isGuest) {
     return <Redirect href="/(auth)/login" />;
   }
 
@@ -23,6 +24,7 @@ export default function AppTabs() {
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.muted,
           tabBarStyle: {
+            backgroundColor: colors.surface,
             borderTopColor: colors.line,
             height: 64 + insets.bottom,
             paddingBottom: 8 + insets.bottom,

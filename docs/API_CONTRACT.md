@@ -2,7 +2,11 @@
 
 Base URL (Docker Compose): `http://127.0.0.1:8001/api/`
 
-All endpoints except `health/`, `auth/login/`, and `auth/refresh/` require:
+- **Public / Guest Read-Only Endpoints**: `GET /api/health/`, `POST /api/auth/login/`, `POST /api/auth/register/`, `POST /api/auth/refresh/`, `GET /api/bootstrap/`, `GET /api/categories/`, `GET /api/buildings/`, `GET /api/pois/` (active POIs only unless authenticated Staff Admin), `GET /api/tracks/`, `POST /api/directions/`.
+- **JWT Authenticated Endpoints**: `POST /api/places/details/`, `GET /api/places/photo/`.
+- **Staff Admin (`is_staff_admin=true`) Only**: `POST`/`PUT`/`PATCH`/`DELETE /api/pois/`, `GET /api/pois/?include_inactive=true`, `POST /api/admin/import-students/`.
+
+All authenticated calls require:
 
 ```text
 Authorization: Bearer <access_token>
@@ -10,49 +14,88 @@ Authorization: Bearer <access_token>
 
 ---
 
-## Authentication
+## Health & Authentication
 
-### `POST /api/auth/login/`
+### `GET /api/health/`
 
-Student login requires `full_name` and `matric_number`. Staff admin accounts (`is_staff_admin=true` or `is_staff=true`) additionally require `password`.
-
-Request (Student):
+Verifies PostgreSQL/PostGIS and Redis cache readiness without throttling. Returns HTTP `200` when the database is healthy (`"ok"` or `"degraded"` if cache fails) and `503` if PostgreSQL is unreachable.
 
 ```json
 {
-  "full_name": "Taigbenu Efezino",
-  "matric_number": "BU22CSC1136"
+  "status": "ok",
+  "service": "Bowen Navigator API",
+  "checks": {
+    "database": "ok",
+    "cache": "ok"
+  },
+  "latency_ms": 2.41
 }
 ```
 
-Request (Staff Admin):
+### `POST /api/auth/register/`
+
+Rate-limited (`20/min` per IP). Creates a new student account (`is_staff_admin=false`) and returns JWT tokens.
+
+Request:
 
 ```json
 {
-  "full_name": "Campus Admin",
-  "matric_number": "ADMIN001",
-  "password": "ADMIN001"
+  "full_name": "Ada Lovelace",
+  "matric_number": "BU23CSC1042",
+  "email": "ada@bowen.edu.ng",
+  "password": "securePassword"
 }
 ```
 
-Response (`200 OK`):
+Response (`201 Created`):
 
 ```json
 {
   "access": "jwt-access-token",
   "refresh": "jwt-refresh-token",
   "user": {
-    "id": 1,
-    "full_name": "Taigbenu Efezino",
-    "matric_number": "BU22CSC1136",
+    "id": 3,
+    "full_name": "Ada Lovelace",
+    "matric_number": "BU23CSC1042",
+    "email": "ada@bowen.edu.ng",
     "is_staff_admin": false
   }
 }
 ```
 
+### `POST /api/auth/login/`
+
+Rate-limited (`20/min` per IP). Requires `matric_number` and `password` (`full_name` is optional).
+
+Request:
+
+```json
+{
+  "matric_number": "BU22CSC1136",
+  "password": "BU22CSC1136"
+}
+```
+
+Response (`200 OK`): same `{ access, refresh, user }` payload.
+
 ### `POST /api/auth/refresh/`
 
 Request: `{ "refresh": "<refresh_token>" }` -> Response: `{ "access": "<new_access_token>" }`.
+
+### `POST /api/admin/import-students/`
+
+Staff Admin only (`403` for students, `401` for guests). Accepts either `{"csv_text": "..."}` or multipart `file` upload (UTF-8 CSV with columns `matric_number,full_name,email,password`). Preserves protected staff/admin accounts.
+
+Response (`200 OK`):
+
+```json
+{
+  "created": 12,
+  "updated": 4,
+  "skipped": 1,
+  "errors": []
+}
+```
 
 ---
 
@@ -60,7 +103,7 @@ Request: `{ "refresh": "<refresh_token>" }` -> Response: `{ "access": "<new_acce
 
 ### `GET /api/bootstrap/`
 
-Single-roundtrip campus payload used by the mobile client. Supports `ETag` / `If-None-Match` conditional requests (`304 Not Modified`).
+Single-roundtrip campus payload used by the mobile client and persisted on disk for offline use. Supports `ETag` / `If-None-Match` (`304 Not Modified`).
 
 Query parameters:
 
@@ -91,34 +134,18 @@ Returns GeoJSON `FeatureCollection` of active POIs (supports `ETag` / `304` when
 
 Query parameters:
 
-- `include_sprites=true`: includes base64 marker sprites (`marker_icon_default`, `marker_icon_compact`, `marker_icon_selected`, `marker_icon_destination`, `marker_anchor_x`); omitted by default for compact payloads.
-- `search`: case-insensitive POI, description, category, or building search
-- `category`: category slug filter
-- `include_inactive=true`: includes inactive POIs
+- `include_sprites=true`: includes base64 marker sprites; omitted by default.
+- `search`: case-insensitive POI, description, category, or building search.
+- `category`: category slug filter.
+- `include_inactive=true`: honored only for authenticated Staff Admin accounts.
 
 ### `POST /api/pois/`, `PUT /api/pois/{id}/`, `PATCH /api/pois/{id}/`, `DELETE /api/pois/{id}/`
 
-Requires a JWT user with `is_staff_admin=true` (students receive `403 Forbidden`).
-
-Create/update request:
-
-```json
-{
-  "name": "New Lecture Hall",
-  "category_id": 1,
-  "description": "Lecture venue near the academic core.",
-  "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
-  "icon_identifier": "school",
-  "google_place_id": "",
-  "latitude": 7.6215,
-  "longitude": 4.199,
-  "is_active": true
-}
-```
+Staff Admin only (`403 Forbidden` for students, `401 Unauthorized` for guests). Creating or updating a POI automatically keeps its associated `Building` record synchronized.
 
 ### `GET /api/tracks/`
 
-Returns GeoJSON `FeatureCollection` of campus pathways as `LineString` features (supports optional `track_type=pedestrian|vehicle|both` filter and `ETag` / `304`).
+Returns GeoJSON `FeatureCollection` of campus pathways as `LineString` features (`track_type=pedestrian|vehicle|both`, supports `ETag` / `304`).
 
 ---
 
@@ -126,7 +153,7 @@ Returns GeoJSON `FeatureCollection` of campus pathways as `LineString` features 
 
 ### `POST /api/directions/`
 
-Computes a mode-aware route over Bowen campus `Track` geometry using a cached topological graph and admissible A\* search. Off-campus origins (>3 km from campus tracks) automatically originate from Bowen Main Gate (`7.621044, 4.190647`).
+Computes a mode-aware route over Bowen campus `Track` geometry using a Redis-synchronized topological graph cache and admissible A\* search (suppressing false-positive curve turns along continuously named roads). Off-campus origins (>3 km from campus tracks) originate from Bowen Main Gate (`7.621044, 4.190647`).
 
 Request:
 
@@ -184,24 +211,10 @@ Response (`200 OK`):
 }
 ```
 
-If no tracks are present in PostGIS, `/api/directions/` returns a `local-fallback` direct route preview.
-
 ---
 
 ## Google Places Proxy
 
-### `POST /api/places/details/`
+### `POST /api/places/details/` & `GET /api/places/photo/`
 
-Request:
-
-```json
-{
-  "place_id": "google-place-id"
-}
-```
-
-Proxies and caches Google Place Details (1h TTL). Photo items include `photo_reference` and `proxy_path` (`/places/photo/?ref=...`) rather than raw Google URLs containing `GOOGLE_PLACES_API_KEY`.
-
-### `GET /api/places/photo/?ref=<photo_reference>&maxwidth=800`
-
-Requires `Authorization: Bearer <access_token>`. Streams the cached place image (`image/jpeg`, 24h server cache + `Cache-Control: private, max-age=86400`) without exposing the server API key.
+Authenticated (`IsAuthenticated`) and rate-limited (`60/min`). Proxies and caches Google Place Details (1h TTL) and Place Photos (24h TTL) via `/places/photo/?ref=...&maxwidth=...` without exposing `GOOGLE_PLACES_API_KEY`.

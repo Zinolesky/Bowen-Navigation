@@ -2,24 +2,37 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 
 import { API_URL, featureToPoi, getCampusBootstrap, getPlaceDetails } from "./api";
 import { useAuth } from "./auth";
+import { loadPersistedBootstrap, savePersistedBootstrap } from "./campusStorage";
 import type { Category, GeoFeatureCollection, Poi, PoiProperties, TrackProperties } from "./types";
 
 type CampusDataContextValue = {
   loading: boolean;
   error: string | null;
+  isOffline: boolean;
+  lastSyncedAt: number | null;
   categories: Category[];
   pois: Poi[];
   tracks?: GeoFeatureCollection<TrackProperties>;
   refreshCampus: (force?: boolean) => Promise<void>;
-  getCachedPlaceDetails: (placeId: string) => Promise<any | null>;
+  getCachedPlaceDetails: (poiOrPlaceId: Poi | string) => Promise<any | null>;
 };
 
 const CampusDataContext = createContext<CampusDataContextValue | undefined>(undefined);
 
+function mapBootstrapPois(features?: GeoFeatureCollection<PoiProperties>["features"]): Poi[] {
+  return (features || []).map((feature) =>
+    featureToPoi(feature as { id?: number; geometry: { coordinates: number[] }; properties: PoiProperties })
+  );
+}
+
 export function CampusDataProvider({ children }: { children: React.ReactNode }) {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, isGuest } = useAuth();
+  const canBrowse = Boolean((user && accessToken) || isGuest);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pois, setPois] = useState<Poi[]>([]);
   const [tracks, setTracks] = useState<GeoFeatureCollection<TrackProperties> | undefined>();
@@ -31,7 +44,7 @@ export function CampusDataProvider({ children }: { children: React.ReactNode }) 
 
   const refreshCampus = useCallback(
     async (force: boolean = false) => {
-      if (!accessToken) {
+      if (!canBrowse) {
         setLoading(false);
         return;
       }
@@ -53,17 +66,26 @@ export function CampusDataProvider({ children }: { children: React.ReactNode }) 
           if (!res.notModified) {
             const { data, etag } = res;
             etagRef.current = etag;
-            const mappedPois = (data.pois?.features || []).map((feature) =>
-              featureToPoi(feature as { id?: number; geometry: { coordinates: number[] }; properties: PoiProperties })
-            );
+            const mappedPois = mapBootstrapPois(data.pois?.features);
             setCategories(data.categories || []);
             setPois(mappedPois);
             setTracks(data.tracks);
             hasLoadedRef.current = true;
+            setLastSyncedAt(Date.now());
+            savePersistedBootstrap(data, etag).catch(() => {});
           }
+          setIsOffline(false);
         } catch (err: any) {
-          setError(`${err?.message || "Check the API connection and try again."}\n\nAPI: ${API_URL}`);
-          throw err;
+          if (hasLoadedRef.current) {
+            setIsOffline(true);
+            setError(null);
+            if (force) {
+              throw err;
+            }
+          } else {
+            setError(`${err?.message || "Check the API connection and try again."}\n\nAPI: ${API_URL}`);
+            throw err;
+          }
         } finally {
           setLoading(false);
           inflightRef.current = null;
@@ -73,33 +95,75 @@ export function CampusDataProvider({ children }: { children: React.ReactNode }) 
       inflightRef.current = task;
       return task;
     },
-    [accessToken]
+    [canBrowse]
   );
 
   useEffect(() => {
-    if (user && accessToken) {
-      refreshCampus(false).catch(() => {});
-    } else {
-      etagRef.current = undefined;
-      hasLoadedRef.current = false;
-      setCategories([]);
-      setPois([]);
-      setTracks(undefined);
-      placeDetailsCacheRef.current.clear();
-      setLoading(false);
-    }
-  }, [user?.id, accessToken, refreshCampus]);
+    let active = true;
 
-  const getCachedPlaceDetails = useCallback(async (placeId: string) => {
-    if (!placeId) return null;
-    const cached = placeDetailsCacheRef.current.get(placeId);
+    async function hydrateAndRevalidate() {
+      if (!canBrowse) {
+        etagRef.current = undefined;
+        hasLoadedRef.current = false;
+        setCategories([]);
+        setPois([]);
+        setTracks(undefined);
+        setIsOffline(false);
+        setLastSyncedAt(null);
+        placeDetailsCacheRef.current.clear();
+        setLoading(false);
+        return;
+      }
+
+      const persisted = await loadPersistedBootstrap();
+      if (active && persisted) {
+        const mappedPois = mapBootstrapPois(persisted.data.pois?.features);
+        etagRef.current = persisted.etag;
+        setCategories(persisted.data.categories || []);
+        setPois(mappedPois);
+        setTracks(persisted.data.tracks);
+        setLastSyncedAt(persisted.savedAt);
+        hasLoadedRef.current = mappedPois.length > 0;
+        if (hasLoadedRef.current) {
+          setLoading(false);
+        }
+      }
+
+      refreshCampus(false).catch(() => {});
+    }
+
+    hydrateAndRevalidate();
+
+    return () => {
+      active = false;
+    };
+  }, [canBrowse, user?.id, refreshCampus]);
+
+  const getCachedPlaceDetails = useCallback(async (poiOrPlaceId: Poi | string) => {
+    const cacheKey =
+      typeof poiOrPlaceId === "string"
+        ? poiOrPlaceId
+        : poiOrPlaceId.google_place_id || `poi-${poiOrPlaceId.id}`;
+    if (!cacheKey) return null;
+
+    const cached = placeDetailsCacheRef.current.get(cacheKey);
     if (cached !== undefined) {
       return cached;
     }
     try {
-      const details = await getPlaceDetails(placeId);
+      const payload =
+        typeof poiOrPlaceId === "string"
+          ? { place_id: poiOrPlaceId }
+          : {
+              place_id: poiOrPlaceId.google_place_id || undefined,
+              poi_id: poiOrPlaceId.id,
+              name: poiOrPlaceId.name,
+              latitude: poiOrPlaceId.latitude,
+              longitude: poiOrPlaceId.longitude
+            };
+      const details = await getPlaceDetails(payload);
       if (details?.result) {
-        placeDetailsCacheRef.current.set(placeId, details.result);
+        placeDetailsCacheRef.current.set(cacheKey, details.result);
         return details.result;
       }
       return null;
@@ -112,13 +176,15 @@ export function CampusDataProvider({ children }: { children: React.ReactNode }) 
     () => ({
       loading,
       error,
+      isOffline,
+      lastSyncedAt,
       categories,
       pois,
       tracks,
       refreshCampus,
       getCachedPlaceDetails
     }),
-    [loading, error, categories, pois, tracks, refreshCampus, getCachedPlaceDetails]
+    [loading, error, isOffline, lastSyncedAt, categories, pois, tracks, refreshCampus, getCachedPlaceDetails]
   );
 
   return <CampusDataContext.Provider value={value}>{children}</CampusDataContext.Provider>;

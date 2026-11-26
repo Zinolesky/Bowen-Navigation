@@ -3,7 +3,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from .models import Building, Category, PointOfInterest, Track
-from .routing import clear_routing_cache
+from .routing import ROUTING_VERSION_KEY, clear_routing_cache
 
 CAMPUS_VERSION_KEY = "campus:data_version"
 
@@ -24,9 +24,26 @@ def bump_campus_cache_version() -> int:
         return 2
 
 
+def get_routing_cache_version() -> int:
+    version = cache.get(ROUTING_VERSION_KEY)
+    if version is None:
+        version = 1
+        cache.set(ROUTING_VERSION_KEY, version, timeout=None)
+    return int(version)
+
+
+def bump_routing_cache_version() -> int:
+    try:
+        return int(cache.incr(ROUTING_VERSION_KEY))
+    except ValueError:
+        cache.set(ROUTING_VERSION_KEY, 2, timeout=None)
+        return 2
+
+
 @receiver([post_save, post_delete], sender=Track)
 def invalidate_track_caches(sender, **kwargs):
-    clear_routing_cache()
+    clear_routing_cache(bump_shared=False)
+    bump_routing_cache_version()
     bump_campus_cache_version()
 
 

@@ -4,7 +4,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { MarkerBadge } from "@/components/MarkerBadge";
-import { colors } from "@/theme";
+import { AppColors, useAppTheme } from "@/theme";
 import type { Poi } from "@/types";
 
 export function OriginPickerModal({
@@ -20,6 +20,8 @@ export function OriginPickerModal({
   onSelectOrigin: (id: number | "gps") => void;
   onClose: () => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -49,7 +51,7 @@ export function OriginPickerModal({
             value={query}
             onChangeText={setQuery}
             placeholder="Filter campus locations..."
-            placeholderTextColor="#8A9691"
+            placeholderTextColor={colors.muted}
             style={styles.searchInput}
           />
           {query ? (
@@ -112,89 +114,90 @@ export function OriginPickerModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.canvas
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: colors.ink
-  },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#F1F5F3",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    margin: 14,
-    paddingHorizontal: 12,
-    height: 46,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.ink
-  },
-  list: {
-    paddingHorizontal: 14,
-    paddingBottom: 24,
-    gap: 8
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line
-  },
-  rowActive: {
-    borderColor: colors.primary,
-    backgroundColor: "#F0FDF9"
-  },
-  gpsBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  rowBody: {
-    flex: 1
-  },
-  rowTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: colors.ink
-  },
-  rowSub: {
-    fontSize: 12.5,
-    color: colors.muted,
-    marginTop: 2
-  }
-});
+const createStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.canvas
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.line
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: "900",
+      color: colors.ink
+    },
+    closeBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surfaceSubtle,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    searchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      margin: 14,
+      paddingHorizontal: 12,
+      height: 46,
+      borderRadius: 10,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.line
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 15,
+      color: colors.ink
+    },
+    list: {
+      paddingHorizontal: 14,
+      paddingBottom: 24,
+      gap: 8
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.line
+    },
+    rowActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft
+    },
+    gpsBadge: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    rowBody: {
+      flex: 1
+    },
+    rowTitle: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: colors.ink
+    },
+    rowSub: {
+      fontSize: 12.5,
+      color: colors.muted,
+      marginTop: 2
+    }
+  });

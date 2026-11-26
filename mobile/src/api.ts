@@ -73,6 +73,7 @@ api.interceptors.response.use(
       originalRequest &&
       !originalRequest._retry &&
       !originalRequest.url?.includes("/auth/login/") &&
+      !originalRequest.url?.includes("/auth/register/") &&
       !originalRequest.url?.includes("/auth/refresh/")
     ) {
       originalRequest._retry = true;
@@ -97,15 +98,49 @@ api.interceptors.response.use(
   }
 );
 
-export async function login(full_name: string, matric_number: string, password?: string) {
-  const payload: { full_name: string; matric_number: string; password?: string } = {
-    full_name: full_name.trim(),
-    matric_number: matric_number.trim().toUpperCase()
+export type AuthResponse = {
+  access: string;
+  refresh: string;
+  user: User;
+};
+
+export async function login(matric_number: string, password: string, full_name?: string) {
+  const payload: { matric_number: string; password: string; full_name?: string } = {
+    matric_number: matric_number.trim().toUpperCase(),
+    password
   };
-  if (password && password.length > 0) {
-    payload.password = password;
+  if (full_name && full_name.trim()) {
+    payload.full_name = full_name.trim();
   }
-  const { data } = await api.post<{ access: string; refresh: string; user: User }>("/auth/login/", payload);
+  const { data } = await api.post<AuthResponse>("/auth/login/", payload);
+  return data;
+}
+
+export async function registerStudent(input: {
+  full_name: string;
+  matric_number: string;
+  email?: string;
+  password: string;
+}) {
+  const payload: { full_name: string; matric_number: string; email?: string; password: string } = {
+    full_name: input.full_name.trim(),
+    matric_number: input.matric_number.trim().toUpperCase(),
+    password: input.password
+  };
+  if (input.email && input.email.trim()) {
+    payload.email = input.email.trim().toLowerCase();
+  }
+  const { data } = await api.post<AuthResponse>("/auth/register/", payload);
+  return data;
+}
+
+export async function importStudentsCsv(csv_text: string) {
+  const { data } = await api.post<{
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: string[];
+  }>("/admin/import-students/", { csv_text });
   return data;
 }
 
@@ -114,11 +149,17 @@ export async function getCategories() {
   return data;
 }
 
-export async function getPois(params?: { search?: string; category?: string; include_sprites?: boolean }) {
+export async function getPois(params?: {
+  search?: string;
+  category?: string;
+  include_sprites?: boolean;
+  include_inactive?: boolean;
+}) {
   const queryParams: Record<string, string> = {};
   if (params?.search) queryParams.search = params.search;
   if (params?.category) queryParams.category = params.category;
   if (params?.include_sprites) queryParams.include_sprites = "true";
+  if (params?.include_inactive) queryParams.include_inactive = "true";
   const { data } = await api.get<GeoFeatureCollection<PoiProperties>>("/pois/", { params: queryParams });
   return data;
 }
@@ -162,8 +203,19 @@ export async function requestDirections(payload: {
   return data;
 }
 
-export async function getPlaceDetails(place_id: string) {
-  const { data } = await api.post("/places/details/", { place_id });
+export async function getPlaceDetails(
+  input:
+    | string
+    | {
+        place_id?: string;
+        poi_id?: number;
+        name?: string;
+        latitude?: number;
+        longitude?: number;
+      }
+) {
+  const payload = typeof input === "string" ? { place_id: input } : input;
+  const { data } = await api.post("/places/details/", payload);
   return data;
 }
 

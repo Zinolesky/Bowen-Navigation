@@ -1,11 +1,10 @@
 import polyline from "@mapbox/polyline";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
-import { LocateFixed, LogOut, RefreshCw, Search } from "lucide-react-native";
+import { LocateFixed, LogIn, LogOut, RefreshCw, Search, ShieldCheck, UserCheck, WifiOff } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   PanResponder,
   Pressable,
@@ -20,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { requestDirections } from "@/api";
 import { useAuth } from "@/auth";
 import { useCampusData } from "@/campusStore";
+import { showAppAlert } from "@/components/AppAlertProvider";
 import { CampusPoisLayer, CampusTracksLayer } from "@/components/CampusMapLayers";
 import { LiveNavigationHud } from "@/components/LiveNavigationHud";
 import { NavigationVehiclePuck } from "@/components/NavigationVehiclePuck";
@@ -27,10 +27,11 @@ import { OriginPickerModal } from "@/components/OriginPickerModal";
 import { PlaceDetailsSheet } from "@/components/PlaceDetailsSheet";
 import { RouteOverviewHeader, RouteOverviewSheet } from "@/components/RouteOverviewSheet";
 import { useLiveNavigation } from "@/hooks/useLiveNavigation";
-import { customMapStyle } from "@/mapStyle";
+import { customMapStyleDark, customMapStyleLight } from "@/mapStyle";
 import type { Coordinate } from "@/navigationUtils";
-import { colors, shadows } from "@/theme";
-import type { ModeEstimate, Poi, RouteStep, TravelMode } from "@/types";
+import { computeOfflineDirections } from "@/offlineRouter";
+import { AppColors, shadows, useAppTheme } from "@/theme";
+import type { DirectionsResponse, ModeEstimate, Poi, RouteStep, TravelMode } from "@/types";
 import {
   buildRoadAndWalkwayPolylines,
   CAMPUS_REGION,
@@ -69,8 +70,11 @@ function decodeOverviewPolyline(raw: unknown): Coordinate[] {
 
 export default function MapScreen() {
   const params = useLocalSearchParams<{ poi?: string; t?: string }>();
-  const { signOut, accessToken } = useAuth();
-  const { categories, pois, tracks, loading, error, refreshCampus, getCachedPlaceDetails } = useCampusData();
+  const { signOut, accessToken, isGuest, user } = useAuth();
+  const { categories, pois, tracks, loading, error, isOffline, refreshCampus, getCachedPlaceDetails } =
+    useCampusData();
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const mapRef = useRef<MapView>(null);
 
@@ -116,7 +120,7 @@ export default function MapScreen() {
   useEffect(() => {
     if (error && pois.length === 0 && !shownErrorRef.current) {
       shownErrorRef.current = true;
-      Alert.alert("Campus data unavailable", error);
+      showAppAlert("Campus data unavailable", error, undefined, "warning");
     }
     if (!error) {
       shownErrorRef.current = false;
@@ -253,7 +257,6 @@ export default function MapScreen() {
         };
       }
 
-      // Fast path: reuse cached campus GPS coordinate (<60s old) for instant route startup
       const cachedGps = lastKnownGpsRef.current;
       if (cachedGps && Date.now() - cachedGps.ts < 60000) {
         if (isCoordinateOnCampus(cachedGps.coord.latitude, cachedGps.coord.longitude)) {
@@ -318,15 +321,35 @@ export default function MapScreen() {
               }
             : await resolveOriginPoint(poi, customOriginId);
 
-          const result = await requestDirections({
-            origin: resolvedOrigin.coords,
-            destination: {
-              latitude: poi.latitude,
-              longitude: poi.longitude
-            },
-            mode: modeToUse,
-            include_alternate: true
-          });
+          let result: DirectionsResponse | null = null;
+          try {
+            result = await requestDirections({
+              origin: resolvedOrigin.coords,
+              destination: {
+                latitude: poi.latitude,
+                longitude: poi.longitude
+              },
+              mode: modeToUse,
+              include_alternate: true
+            });
+          } catch {
+            if (tracks?.features?.length) {
+              result = computeOfflineDirections({
+                origin: resolvedOrigin.coords,
+                destination: {
+                  latitude: poi.latitude,
+                  longitude: poi.longitude
+                },
+                mode: modeToUse,
+                tracks,
+                includeAlternate: true
+              });
+            }
+          }
+
+          if (!result) {
+            throw new Error("Directions unavailable");
+          }
 
           if (gen !== routeRequestGenRef.current || selectedPoiIdRef.current !== poi.id) {
             return null;
@@ -359,7 +382,12 @@ export default function MapScreen() {
           return { coords: decoded, steps, meta };
         } catch {
           if (!options?.silent) {
-            Alert.alert("Directions unavailable", "The route could not be generated right now.");
+            showAppAlert(
+              "Directions unavailable",
+              "The route could not be generated right now.",
+              undefined,
+              "warning"
+            );
           }
           return null;
         } finally {
@@ -375,7 +403,7 @@ export default function MapScreen() {
       inflightRouteRef.current = { key, promise };
       return promise;
     },
-    [originPoiId, panY, resolveOriginPoint]
+    [originPoiId, panY, resolveOriginPoint, tracks]
   );
 
   const handleReroute = useCallback(
@@ -427,13 +455,12 @@ export default function MapScreen() {
       setMapRegion(nextRegion);
       mapRef.current?.animateToRegion(nextRegion, 450);
 
-      // Speculatively prefetch route in background so clicking Directions/Start is instant
       fetchRouteForMode(poi, travelMode, originPoiId, { silent: true }).catch(() => {});
 
-      if (poi.google_place_id) {
+      if (!isOffline) {
         setFetchingDetails(true);
         try {
-          const details = await getCachedPlaceDetails(poi.google_place_id);
+          const details = await getCachedPlaceDetails(poi);
           if (selectedPoiIdRef.current === poi.id && details) {
             setPlaceDetails(details);
           }
@@ -444,7 +471,7 @@ export default function MapScreen() {
         }
       }
     },
-    [fetchRouteForMode, getCachedPlaceDetails, originPoiId, panY, stopLiveNav, travelMode]
+    [fetchRouteForMode, getCachedPlaceDetails, isOffline, originPoiId, panY, stopLiveNav, travelMode]
   );
 
   const closePoiSheet = useCallback(() => {
@@ -629,16 +656,45 @@ export default function MapScreen() {
     try {
       await refreshCampus(true);
     } catch {
-      Alert.alert("Refresh failed", "Check the API connection and try again.");
+      showAppAlert(
+        "Offline mode",
+        pois.length > 0
+          ? "Could not reach the server. Using your saved campus map."
+          : "Check the API connection and try again.",
+        undefined,
+        "warning"
+      );
     }
   }
 
-  function confirmSignOut() {
-    Alert.alert("Sign out", "Sign out of Bowen Navigator?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => signOut() }
-    ]);
+  function handleAuthAction() {
+    if (isGuest) {
+      signOut().then(() => router.replace("/(auth)/login"));
+      return;
+    }
+    showAppAlert(
+      "Sign out",
+      "Sign out of Bowen Navigator?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sign out", style: "destructive", onPress: () => signOut() }
+      ],
+      "warning"
+    );
   }
+
+  const mapEdgePadding = useMemo(() => {
+    if (navStage === "live_navigation") {
+      return { top: 210, right: 12, bottom: 110, left: 12 };
+    }
+    if (navStage === "route_overview") {
+      return { top: 118, right: 12, bottom: 260, left: 12 };
+    }
+    if (navStage === "place_details") {
+      return { top: 90, right: 12, bottom: 320, left: 12 };
+    }
+    return { top: 136, right: 12, bottom: 16, left: 12 };
+  }, [navStage]);
 
   return (
     <View style={styles.screen}>
@@ -649,14 +705,28 @@ export default function MapScreen() {
         initialRegion={CAMPUS_REGION}
         showsUserLocation={navStage !== "live_navigation"}
         showsMyLocationButton={false}
+        showsCompass={false}
         toolbarEnabled={false}
-        customMapStyle={customMapStyle}
+        mapPadding={mapEdgePadding}
+        userInterfaceStyle={isDark ? "dark" : "light"}
+        customMapStyle={isDark ? customMapStyleDark : customMapStyleLight}
         onMapReady={initializeLocation}
-        onRegionChangeComplete={(region) => setMapRegion(region)}
+        onPanDrag={() => {
+          if (navStage === "live_navigation") {
+            liveNav.pauseCameraFollow();
+          }
+        }}
+        onRegionChangeComplete={(region, details) => {
+          setMapRegion(region);
+          if (navStage === "live_navigation" && details?.isGesture) {
+            liveNav.pauseCameraFollow();
+          }
+        }}
       >
         <CampusTracksLayer
           drivewayPolylines={drivewayPolylines}
           standaloneWalkwayPolylines={standaloneWalkwayPolylines}
+          isDark={isDark}
         />
 
         {(navStage === "route_overview" || navStage === "live_navigation") && routeCoords.length > 1 && (
@@ -702,7 +772,6 @@ export default function MapScreen() {
             flat
             zIndex={40}
           >
-            {/* Dynamic import avoided for perf */}
             <NavPuckWrapper mode={travelMode} />
           </Marker>
         )}
@@ -721,8 +790,20 @@ export default function MapScreen() {
         <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
           <View style={[styles.topBar, shadows.card]}>
             <Pressable style={styles.searchButton} onPress={() => router.push("/(app)/search")}>
-              <Search size={20} color={colors.muted} />
-              <Text style={styles.searchText}>Search Bowen campus</Text>
+              <Search size={19} color={colors.primary} />
+              <Text numberOfLines={1} style={styles.searchText}>
+                Search Bowen campus…
+              </Text>
+              <View style={styles.userRoleBadge}>
+                {user?.is_staff_admin ? (
+                  <ShieldCheck size={11} color={colors.primary} />
+                ) : !isGuest ? (
+                  <UserCheck size={11} color={colors.primary} />
+                ) : null}
+                <Text style={styles.userRoleText}>
+                  {user?.is_staff_admin ? "Admin" : isGuest ? "Guest" : user?.matric_number || "Student"}
+                </Text>
+              </View>
             </Pressable>
             <Pressable style={styles.iconButton} onPress={handleManualRefresh}>
               <RefreshCw size={18} color={colors.primary} />
@@ -730,8 +811,8 @@ export default function MapScreen() {
             <Pressable style={styles.iconButton} onPress={showMyLocation}>
               <LocateFixed size={18} color={colors.primary} />
             </Pressable>
-            <Pressable style={styles.iconButton} onPress={confirmSignOut}>
-              <LogOut size={18} color={colors.muted} />
+            <Pressable style={styles.iconButton} onPress={handleAuthAction}>
+              {isGuest ? <LogIn size={18} color={colors.primary} /> : <LogOut size={18} color={colors.muted} />}
             </Pressable>
           </View>
 
@@ -746,23 +827,33 @@ export default function MapScreen() {
                   onPress={() => setSelectedCategory(undefined)}
                   style={[styles.chip, !selectedCategory && styles.chipActive]}
                 >
-                  <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>All</Text>
+                  <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>
+                    All ({pois.length})
+                  </Text>
                 </Pressable>
-                {categories.map((category) => (
-                  <Pressable
-                    key={category.id}
-                    onPress={() => setSelectedCategory(category.slug)}
-                    style={[
-                      styles.chip,
-                      selectedCategory === category.slug && styles.chipActive,
-                      { borderColor: category.color }
-                    ]}
-                  >
-                    <Text style={[styles.chipText, selectedCategory === category.slug && styles.chipTextActive]}>
-                      {category.name}
-                    </Text>
-                  </Pressable>
-                ))}
+                {categories.map((category) => {
+                  const active = selectedCategory === category.slug;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() => setSelectedCategory(category.slug)}
+                      style={[
+                        styles.chip,
+                        active && { backgroundColor: category.color, borderColor: category.color }
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.chipDot,
+                          { backgroundColor: active ? "#FFFFFF" : category.color }
+                        ]}
+                      />
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {category.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
 
               <View pointerEvents="none" style={styles.legendRow}>
@@ -783,6 +874,13 @@ export default function MapScreen() {
                     <Text style={styles.legendText}>Walkway (Off-road)</Text>
                   </View>
                 </View>
+
+                {isOffline && (
+                  <View style={[styles.offlineChip, shadows.card]}>
+                    <WifiOff size={12} color={colors.warning} />
+                    <Text style={styles.offlineChipText}>Offline • Saved campus map</Text>
+                  </View>
+                )}
               </View>
             </>
           )}
@@ -804,6 +902,7 @@ export default function MapScreen() {
         <LiveNavigationHud
           currentStep={liveNav.currentStep}
           nextStep={liveNav.nextStep}
+          thenStep={liveNav.thenStep}
           distToNextManeuver={liveNav.distToNextManeuver}
           remainingDistanceMeters={liveNav.remainingDistanceMeters}
           remainingDurationSeconds={liveNav.remainingDurationSeconds}
@@ -812,6 +911,7 @@ export default function MapScreen() {
           isMuted={liveNav.isMuted}
           hasArrived={liveNav.hasArrived}
           isRerouting={liveNav.isRerouting}
+          isCameraFollowing={liveNav.isCameraFollowing}
           destinationName={selectedPoi.name}
           onToggleSimulation={liveNav.toggleSimulation}
           onToggleMute={liveNav.toggleMute}
@@ -833,6 +933,7 @@ export default function MapScreen() {
           routing={routing}
           routeDurationText={routeMeta?.durationText}
           routeDistanceText={routeMeta?.distanceText}
+          routeSummary={routeMeta?.summary}
           originLabel={routeMeta?.originLabel || currentOriginLabel}
           alternateModes={routeMeta?.alternateModes}
           routeSteps={routeSteps}
@@ -888,144 +989,188 @@ const NavPuckWrapper = React.memo(function NavPuckWrapper({ mode }: { mode: Trav
   return <NavigationVehiclePuck mode={mode} />;
 });
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.canvas
-  },
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginHorizontal: 14,
-    marginTop: 8,
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line
-  },
-  searchButton: {
-    flex: 1,
-    height: 42,
-    borderRadius: 8,
-    backgroundColor: "#F6FAF8",
-    alignItems: "center",
-    flexDirection: "row",
-    paddingHorizontal: 12,
-    gap: 8
-  },
-  searchText: {
-    color: colors.muted,
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  iconButton: {
-    width: 40,
-    height: 42,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  chipRow: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    gap: 8
-  },
-  chip: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    height: 34,
-    justifyContent: "center"
-  },
-  chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary
-  },
-  chipText: {
-    color: colors.muted,
-    fontWeight: "800",
-    fontSize: 13
-  },
-  chipTextActive: {
-    color: "#FFFFFF"
-  },
-  legendRow: {
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    alignItems: "flex-start"
-  },
-  legendBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: colors.line,
-    gap: 10
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6
-  },
-  legendDrivewaySample: {
-    width: 22,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#64748B",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  legendDrivewayInner: {
-    width: 18,
-    height: 2.5,
-    borderRadius: 1.5,
-    backgroundColor: "#E2E8F0"
-  },
-  legendDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: colors.line
-  },
-  legendWalkwaySample: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2.5
-  },
-  legendWalkwayDash: {
-    width: 5,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: "#0D9488"
-  },
-  legendText: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  loading: {
-    position: "absolute",
-    alignSelf: "center",
-    top: "50%",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center"
-  }
-});
+const createStyles = (colors: AppColors, isDark: boolean) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.canvas
+    },
+    overlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0
+    },
+    topBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      marginHorizontal: 12,
+      marginTop: 8,
+      padding: 7,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.line
+    },
+    searchButton: {
+      flex: 1,
+      height: 42,
+      borderRadius: 11,
+      backgroundColor: colors.surfaceSubtle,
+      alignItems: "center",
+      flexDirection: "row",
+      paddingHorizontal: 11,
+      gap: 8
+    },
+    searchText: {
+      flex: 1,
+      color: colors.muted,
+      fontSize: 14.5,
+      fontWeight: "700"
+    },
+    userRoleBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3.5,
+      borderRadius: 8,
+      backgroundColor: colors.primarySoft,
+      borderWidth: 1,
+      borderColor: colors.line
+    },
+    userRoleText: {
+      color: colors.primary,
+      fontSize: 10.5,
+      fontWeight: "900"
+    },
+    iconButton: {
+      width: 40,
+      height: 42,
+      borderRadius: 11,
+      borderWidth: 1,
+      borderColor: colors.line,
+      backgroundColor: colors.surfaceSubtle,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    chipRow: {
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      gap: 8
+    },
+    chip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.line,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 13,
+      height: 36,
+      justifyContent: "center"
+    },
+    chipDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5
+    },
+    chipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary
+    },
+    chipText: {
+      color: colors.ink,
+      fontWeight: "800",
+      fontSize: 12.5
+    },
+    chipTextActive: {
+      color: "#FFFFFF"
+    },
+    legendRow: {
+      paddingHorizontal: 14,
+      paddingTop: 8,
+      alignItems: "flex-start",
+      gap: 6
+    },
+    legendBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "rgba(20, 31, 28, 0.94)" : "rgba(255, 255, 255, 0.95)",
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor: colors.line,
+      gap: 10
+    },
+    legendItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6
+    },
+    legendDrivewaySample: {
+      width: 22,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: isDark ? "#0F172A" : "#64748B",
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    legendDrivewayInner: {
+      width: 18,
+      height: 2.5,
+      borderRadius: 1.5,
+      backgroundColor: isDark ? "#64748B" : "#E2E8F0"
+    },
+    legendDivider: {
+      width: 1,
+      height: 14,
+      backgroundColor: colors.line
+    },
+    legendWalkwaySample: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 2.5
+    },
+    legendWalkwayDash: {
+      width: 5,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: isDark ? "#2DD4BF" : "#0D9488"
+    },
+    legendText: {
+      color: colors.ink,
+      fontSize: 11,
+      fontWeight: "800"
+    },
+    offlineChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.warningSoft,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: colors.warning
+    },
+    offlineChipText: {
+      color: colors.warning,
+      fontSize: 11,
+      fontWeight: "800"
+    },
+    loading: {
+      position: "absolute",
+      alignSelf: "center",
+      top: "50%",
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  });

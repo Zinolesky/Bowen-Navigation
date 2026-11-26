@@ -4,6 +4,8 @@ import math
 import threading
 from typing import Dict, List, Optional, Tuple
 
+from django.core.cache import cache
+
 from .google import encode_polyline
 from .models import Track, infer_track_type_from_text
 
@@ -29,6 +31,8 @@ GraphType = Dict[Coord, List[Tuple[Coord, float, float, str, str]]]
 EdgeMetaType = Dict[Tuple[Coord, Coord], Tuple[str, str]]
 NodeXYType = Dict[Coord, Tuple[float, float]]
 
+ROUTING_VERSION_KEY = "campus:routing_version"
+
 _CACHE_LOCK = threading.RLock()
 _CACHE_VERSION = 0
 _META_CACHE: Optional[Tuple[int, Tuple[Coord, ...], Optional[Coord]]] = None
@@ -39,7 +43,34 @@ _ROUTE_CACHE: OrderedDict = OrderedDict()
 _ROUTE_CACHE_MAX = 256
 
 
-def clear_routing_cache() -> None:
+def _get_shared_routing_version() -> Optional[int]:
+    try:
+        version = cache.get(ROUTING_VERSION_KEY)
+        if version is None:
+            version = 1
+            cache.set(ROUTING_VERSION_KEY, version, timeout=None)
+        return int(version)
+    except Exception:
+        return None
+
+
+def _sync_worker_cache_version() -> int:
+    """
+    Synchronizes this Gunicorn worker's in-process graph/route caches with the
+    shared Redis routing version so Track edits invalidate every worker.
+    """
+    global _CACHE_VERSION, _META_CACHE
+    shared_version = _get_shared_routing_version()
+    with _CACHE_LOCK:
+        if shared_version is not None and _CACHE_VERSION != shared_version:
+            _CACHE_VERSION = shared_version
+            _META_CACHE = None
+            _GRAPH_CACHE.clear()
+            _ROUTE_CACHE.clear()
+        return _CACHE_VERSION
+
+
+def clear_routing_cache(bump_shared: bool = True) -> None:
     """Invalidate compiled topological graphs, vertex metadata, and cached routes."""
     global _CACHE_VERSION, _META_CACHE
     with _CACHE_LOCK:
@@ -47,6 +78,13 @@ def clear_routing_cache() -> None:
         _META_CACHE = None
         _GRAPH_CACHE.clear()
         _ROUTE_CACHE.clear()
+        local_next = _CACHE_VERSION
+
+    if bump_shared:
+        try:
+            cache.set(ROUTING_VERSION_KEY, local_next, timeout=None)
+        except Exception:
+            pass
 
 
 def _round_coord(coord: Tuple[float, float]) -> Coord:
@@ -396,8 +434,8 @@ def _build_topological_network(
 def _get_campus_vertex_meta() -> Tuple[Tuple[Coord, ...], Optional[Coord]]:
     """Returns cached (all_track_vertices, closest_gate_vertex) for off-campus detection."""
     global _META_CACHE
+    version = _sync_worker_cache_version()
     with _CACHE_LOCK:
-        version = _CACHE_VERSION
         if _META_CACHE is not None and _META_CACHE[0] == version:
             return _META_CACHE[1], _META_CACHE[2]
 
@@ -433,8 +471,8 @@ def _get_cached_network(
     - 'walking_strict'
     - 'walking_hybrid'
     """
+    version = _sync_worker_cache_version()
     with _CACHE_LOCK:
-        version = _CACHE_VERSION
         cached = _GRAPH_CACHE.get(network_key)
         if cached is not None and cached[0] == version:
             return cached[1], cached[2], cached[3], cached[4]
@@ -863,10 +901,29 @@ def _build_turn_by_turn_steps(
         ]
 
     steps: List[dict] = []
-    curr_coords: List[Coord] = [raw_segs[0][0], raw_segs[0][1]]
-    curr_dist = raw_segs[0][2]
-    curr_name = raw_segs[0][4]
-    first_bearing = raw_segs[0][3]
+    # Absorb short leading unnamed access paths (< 30 m) directly into the first named road segment
+    start_idx = 0
+    first_named_idx: Optional[int] = None
+    leading_access_dist = 0.0
+    for idx_seg, seg in enumerate(raw_segs):
+        seg_name = seg[4]
+        if seg_name and seg_name not in ("Access Path", "Direct Path"):
+            first_named_idx = idx_seg
+            break
+        leading_access_dist += seg[2]
+
+    if first_named_idx is not None and first_named_idx > 0 and leading_access_dist < 30.0:
+        curr_coords = [raw_segs[0][0]] + [raw_segs[k][1] for k in range(first_named_idx + 1)]
+        curr_dist = leading_access_dist + raw_segs[first_named_idx][2]
+        curr_name = raw_segs[first_named_idx][4]
+        first_bearing = raw_segs[first_named_idx][3]
+        start_idx = first_named_idx
+    else:
+        curr_coords = [raw_segs[0][0], raw_segs[0][1]]
+        curr_dist = raw_segs[0][2]
+        curr_name = raw_segs[0][4]
+        first_bearing = raw_segs[0][3]
+
     curr_maneuver = "depart"
     curr_instruction = (
         f"Head {_compass_direction(first_bearing)} on {curr_name}"
@@ -875,12 +932,25 @@ def _build_turn_by_turn_steps(
     )
     prev_bearing = first_bearing
 
-    for i in range(1, len(raw_segs)):
+    for i in range(start_idx + 1, len(raw_segs)):
         u, v, dist, bearing, name = raw_segs[i]
+        diff = (bearing - prev_bearing + 540.0) % 360.0 - 180.0
+        abs_diff = abs(diff)
+        same_named_road = bool(
+            curr_name and name and curr_name == name and name not in ("Access Path", "Direct Path")
+        )
         turn = _turn_phrase(prev_bearing, bearing)
         name_changed = bool(name and name != curr_name and name not in ("Access Path", "Direct Path"))
 
-        if (turn and curr_dist >= 8.0) or (name_changed and curr_dist >= 15.0):
+        if same_named_road:
+            # Stay on the same continuous curved road unless making a true >= 115 deg switchback
+            should_split = abs_diff >= 115.0 and curr_dist >= 8.0
+        else:
+            should_split = (turn is not None and curr_dist >= 8.0) or (
+                name_changed and curr_dist >= 15.0
+            )
+
+        if should_split:
             lat_lng_pts = [(lat, lon) for lon, lat in curr_coords]
             steps.append(
                 {
@@ -908,7 +978,10 @@ def _build_turn_by_turn_steps(
         else:
             curr_coords.append(v)
             curr_dist += dist
-            if not curr_name and name:
+            if curr_name in ("", "Access Path", "Direct Path") and name and name not in (
+                "Access Path",
+                "Direct Path",
+            ):
                 curr_name = name
         if dist >= 2.0:
             prev_bearing = bearing
@@ -1024,9 +1097,10 @@ def dijkstra_route(
         origin_lonlat = closest_gate_vertex
         mode_label = f"From Main Gate • {mode_label}"
 
+    active_version = _sync_worker_cache_version()
     with _CACHE_LOCK:
         cache_key = (
-            _CACHE_VERSION,
+            active_version,
             norm_mode,
             bool(include_alternate),
             round(origin_lonlat[0], 5),

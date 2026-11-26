@@ -2,6 +2,7 @@ export type User = {
   id: number;
   full_name: string;
   matric_number: string;
+  email?: string;
   is_staff_admin: boolean;
 };
 

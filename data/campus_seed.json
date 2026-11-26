@@ -334,7 +334,7 @@
       "description": "Central administrative building for university leadership, registry, and records.",
       "operating_hours": "Mon-Fri, 8:00 AM - 4:00 PM",
       "icon_identifier": "briefcase",
-      "google_place_id": ""
+      "google_place_id": "ChIJwSWWfwDbORARp-eQ7PpYC_s"
     },
     {
       "name": "Timothy Olagbenro Library",
@@ -424,7 +424,7 @@
       "description": "Academic building and lecture halls for Social and Management Sciences.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
       "icon_identifier": "school",
-      "google_place_id": ""
+      "google_place_id": "ChIJsXdvfOXaORAR6-h9PgivrxY"
     },
     {
       "name": "Bowen University Digital Center",
@@ -451,7 +451,7 @@
       "description": "IT certification and practical computing centre along the main campus road.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
       "icon_identifier": "school",
-      "google_place_id": ""
+      "google_place_id": "ChIJyYWSFOPaORARfFrEkKcXJrQ"
     },
     {
       "name": "Sadler Female Hostel",
@@ -478,7 +478,7 @@
       "description": "Student residential hall adjacent to Mark and John Halls.",
       "operating_hours": "Residents only",
       "icon_identifier": "home",
-      "google_place_id": ""
+      "google_place_id": "ChIJuzwnKvDaORARXckMHExkcAk"
     },
     {
       "name": "Gamaliel Onosode Hall",
@@ -487,7 +487,7 @@
       "description": "Student residential hostel at the northeastern end of campus.",
       "operating_hours": "Residents only",
       "icon_identifier": "home",
-      "google_place_id": ""
+      "google_place_id": "ChIJpR2G3fHaORARbr4JuGS70tk"
     },
     {
       "name": "Blessed Cafe",
@@ -514,7 +514,7 @@
       "description": "College of Agriculture, Engineering and Science building in the eastern academic zone.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
       "icon_identifier": "graduation-cap",
-      "google_place_id": ""
+      "google_place_id": "ChIJeclLa-7aORARO3DYdN3CRFM"
     },
     {
       "name": "Department of Chemistry",
@@ -523,7 +523,7 @@
       "description": "Department of Chemistry and Industrial Chemistry laboratories and offices.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
       "icon_identifier": "graduation-cap",
-      "google_place_id": ""
+      "google_place_id": "ChIJnUgUle_aORAR20pz7_Qi7qU"
     },
     {
       "name": "Department of Political Science",
@@ -532,7 +532,7 @@
       "description": "Department of Political Science and Diplomatic Studies in the central academic core.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
       "icon_identifier": "graduation-cap",
-      "google_place_id": ""
+      "google_place_id": "ChIJsXdvfOXaORAR6-h9PgivrxY"
     },
     {
       "name": "SMS Lecture Halls",
@@ -541,7 +541,7 @@
       "description": "Social and Management Sciences lecture halls and classrooms.",
       "operating_hours": "Mon-Sat, 8:00 AM - 6:00 PM",
       "icon_identifier": "graduation-cap",
-      "google_place_id": ""
+      "google_place_id": "ChIJYQuoUrrbORARhozckg-dL3w"
     },
     {
       "name": "Physiology Department",
@@ -550,7 +550,7 @@
       "description": "Department of Physiology in the College of Health Sciences precinct.",
       "operating_hours": "Mon-Fri, 8:00 AM - 5:00 PM",
       "icon_identifier": "graduation-cap",
-      "google_place_id": ""
+      "google_place_id": "ChIJ-SV8pe7aORAR33huipBu9Vw"
     },
     {
       "name": "Bowen Radio 101.9 FM",
@@ -559,7 +559,7 @@
       "description": "Campus broadcasting station and media studio.",
       "operating_hours": "Daily, 6:00 AM - 10:00 PM",
       "icon_identifier": "building-2",
-      "google_place_id": ""
+      "google_place_id": "ChIJuxAu5GnbORARb_gTI5JQubk"
     },
     {
       "name": "Bowen Guest House",
@@ -568,7 +568,7 @@
       "description": "University hospitality and guest lodging along the main campus avenue.",
       "operating_hours": "Open 24 Hours",
       "icon_identifier": "bed",
-      "google_place_id": ""
+      "google_place_id": "ChIJ4bmGkeTaORARdsXSb6LRLl0"
     },
     {
       "name": "Matthew Hall",
@@ -577,7 +577,7 @@
       "description": "Male student residential hall in the northern hostel zone.",
       "operating_hours": "Open daily",
       "icon_identifier": "bed",
-      "google_place_id": ""
+      "google_place_id": "ChIJFYCa3-_aORARidCgbBfE2Dc"
     },
     {
       "name": "John Hall",
@@ -586,7 +586,7 @@
       "description": "Male student residential hall next to Luke Hall.",
       "operating_hours": "Open daily",
       "icon_identifier": "bed",
-      "google_place_id": ""
+      "google_place_id": "ChIJLQthLvDaORARmkfl6jn7QDI"
     },
     {
       "name": "UPE 1 Hostel",
@@ -595,7 +595,7 @@
       "description": "Student residential hostel in the western campus zone.",
       "operating_hours": "Open daily",
       "icon_identifier": "bed",
-      "google_place_id": ""
+      "google_place_id": "ChIJE0WxqeLaORARmX9XLCok6RA"
     },
     {
       "name": "UPE 2 Hostel",
@@ -604,7 +604,7 @@
       "description": "Student residential hostel adjacent to UPE 1 and UPE 3.",
       "operating_hours": "Open daily",
       "icon_identifier": "bed",
-      "google_place_id": ""
+      "google_place_id": "ChIJTTAyWR3bORARdRHdWczTkN8"
     },
     {
       "name": "UPE 3 Hostel",
@@ -613,7 +613,7 @@
       "description": "Student residential hostel near the western campus entrance.",
       "operating_hours": "Open daily",
       "icon_identifier": "bed",
-      "google_place_id": ""
+      "google_place_id": "ChIJ_zAyZx3bORARCkAmKK3eDps"
     },
     {
       "name": "BUWA Cafeteria",
@@ -622,7 +622,7 @@
       "description": "Bowen University Women Association cafeteria and dining hall.",
       "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
       "icon_identifier": "utensils",
-      "google_place_id": ""
+      "google_place_id": "ChIJkRk5ty3bORARLIIFOIwahQ4"
     },
     {
       "name": "Y2K Cafe",
@@ -631,7 +631,7 @@
       "description": "Student cafeteria and restaurant near BUWA and Blessed Cafe.",
       "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
       "icon_identifier": "utensils",
-      "google_place_id": ""
+      "google_place_id": "ChIJ87h0NO7aORARTBUjWkG6mAo"
     },
     {
       "name": "BBSF Cafe",
@@ -640,7 +640,7 @@
       "description": "Campus cafe and refreshment spot near Tito Gate.",
       "operating_hours": "Mon-Sat, 7:30 AM - 8:30 PM",
       "icon_identifier": "utensils",
-      "google_place_id": ""
+      "google_place_id": "ChIJ_RQAfj_bORARuU1yg7AlATw"
     },
     {
       "name": "Tito Gate",
@@ -649,7 +649,7 @@
       "description": "Eastern campus pedestrian and vehicular access gate.",
       "operating_hours": "Daily, 6:00 AM - 10:00 PM",
       "icon_identifier": "navigation",
-      "google_place_id": ""
+      "google_place_id": "ChIJ0THzsa3bORARFXd62mkjcuA"
     },
     {
       "name": "Walking Park",
@@ -658,7 +658,7 @@
       "description": "Landscaped campus relaxation park east of the library and chapel.",
       "operating_hours": "Open daily",
       "icon_identifier": "trees",
-      "google_place_id": ""
+      "google_place_id": "ChIJKVmjcLrbORARmJJh2xwWQXk"
     }
   ],
   "tracks": [
@@ -2219,6 +2219,266 @@
         [
           7.62417,
           4.19402
+        ]
+      ]
+    },
+    {
+      "name": "Faculty of Agriculture Access Road",
+      "description": "Connector spur from Northern Hostel Road down to Faculty of Agriculture.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.623476,
+          4.206439
+        ],
+        [
+          7.62285,
+          4.20656
+        ],
+        [
+          7.62228,
+          4.20667
+        ]
+      ]
+    },
+    {
+      "name": "Bowen Guest House Driveway",
+      "description": "Access driveway branching north from Bowen Campus Main Road to Bowen Guest House.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.620576,
+          4.197852
+        ],
+        [
+          7.62108,
+          4.19805
+        ],
+        [
+          7.6215,
+          4.19822
+        ]
+      ]
+    },
+    {
+      "name": "Sports Complex Access Drive",
+      "description": "Access drive branching off Western Campus & Sadler Hostel Drive to Sports Complex.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.625172,
+          4.193028
+        ],
+        [
+          7.6247,
+          4.19255
+        ]
+      ]
+    },
+    {
+      "name": "BUPAF Cafeteria Spur",
+      "description": "Short connector spur from Western Campus & Sadler Hostel Drive to BUPAF Cafeteria.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.62545,
+          4.19237
+        ],
+        [
+          7.62583,
+          4.19234
+        ]
+      ]
+    },
+    {
+      "name": "UPE 2 & UPE 3 Hostels Access Lane",
+      "description": "Connector lane linking Bowen Campus Main Road past UPE 3 and UPE 2 Hostels to Sadler Hostel Walkway.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.621751,
+          4.192211
+        ],
+        [
+          7.622281,
+          4.19204
+        ],
+        [
+          7.622754,
+          4.19216
+        ],
+        [
+          7.623265,
+          4.192443
+        ]
+      ]
+    },
+    {
+      "name": "Blessed, Y2K & BUWA Cafeterias Connector",
+      "description": "Access path linking Northern Hostel Road through Blessed Cafe, Y2K Cafe, and BUWA Cafeteria.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.623228,
+          4.205217
+        ],
+        [
+          7.622837,
+          4.205304
+        ],
+        [
+          7.622592,
+          4.205385
+        ],
+        [
+          7.622499,
+          4.205511
+        ],
+        [
+          7.622378,
+          4.204928
+        ]
+      ]
+    },
+    {
+      "name": "Chemistry & Science Complex Walkway",
+      "description": "Pedestrian walkway from Academic Core Pedestrian Spine north to Department of Chemistry.",
+      "track_type": "pedestrian",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.62162,
+          4.20389
+        ],
+        [
+          7.62216,
+          4.203795
+        ]
+      ]
+    },
+    {
+      "name": "New Horizon ICT Hub Access",
+      "description": "Connector spur from Bowen Campus Main Road to New Horizon ICT Hub.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.621589,
+          4.195822
+        ],
+        [
+          7.62203,
+          4.196045
+        ]
+      ]
+    },
+    {
+      "name": "288 Smart Hostel Courtyard Drive",
+      "description": "Access spur from Smart Hostel Access Road into 288 Smart Hostel courtyard.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.616939,
+          4.206836
+        ],
+        [
+          7.61738,
+          4.2066
+        ]
+      ]
+    },
+    {
+      "name": "Tito Gate & BBSF Cafe Connector",
+      "description": "Connector spur from Eastern Campus Road via Tito Gate to BBSF Cafe.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.619579,
+          4.205493
+        ],
+        [
+          7.619644,
+          4.205862
+        ],
+        [
+          7.619509,
+          4.206047
+        ],
+        [
+          7.619417,
+          4.205522
+        ]
+      ]
+    },
+    {
+      "name": "Senate Building Forecourt Drive",
+      "description": "Forecourt connector between Northern Hostel Road and Senate Building entrance.",
+      "track_type": "both",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.621887,
+          4.201178
+        ],
+        [
+          7.621745,
+          4.20073
+        ]
+      ]
+    },
+    {
+      "name": "Political Science Walkway",
+      "description": "Pedestrian walkway branching off Academic Core Pedestrian Spine to Department of Political Science.",
+      "track_type": "pedestrian",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.620969,
+          4.201748
+        ],
+        [
+          7.62135,
+          4.201815
+        ]
+      ]
+    },
+    {
+      "name": "Walking Park Access Path",
+      "description": "Pedestrian entrance path from Library to Worship Centre & Computing Road into Walking Park.",
+      "track_type": "pedestrian",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.61928,
+          4.20314
+        ],
+        [
+          7.61913,
+          4.20351
+        ]
+      ]
+    },
+    {
+      "name": "John Hall Courtyard Spur",
+      "description": "Pedestrian walkway spur connecting Mark & Luke Halls Courtyard Walkway north to John Hall.",
+      "track_type": "pedestrian",
+      "source": "seed",
+      "coordinates": [
+        [
+          7.623752,
+          4.204703
+        ],
+        [
+          7.62412,
+          4.204755
         ]
       ]
     }

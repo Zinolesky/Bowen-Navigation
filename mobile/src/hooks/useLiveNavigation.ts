@@ -1,9 +1,9 @@
 import * as Location from "expo-location";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert } from "react-native";
 import type MapView from "react-native-maps";
 
+import { showAppAlert } from "@/components/AppAlertProvider";
 import {
   advanceAlongRoute,
   bearingDegrees,
@@ -26,6 +26,25 @@ type UseLiveNavigationArgs = {
   onReroute: (fromCoord: Coordinate) => Promise<void>;
 };
 
+const MILESTONE_METERS = [600, 300, 150, 60] as const;
+const PERIODIC_VOICE_INTERVAL_MS = 18000;
+
+function formatSpokenDistance(meters: number): string {
+  const m = Math.max(5, Math.round(meters));
+  if (m >= 1000) {
+    const km = (m / 1000).toFixed(1);
+    return `${km} kilometers`;
+  }
+  if (m >= 100) {
+    return `${Math.round(m / 10) * 10} meters`;
+  }
+  return `${Math.max(5, Math.round(m / 5) * 5)} meters`;
+}
+
+function cleanInstructionText(text?: string): string {
+  return (text || "").replace(/\.$/, "").trim();
+}
+
 export function useLiveNavigation({
   isActive,
   routeCoords,
@@ -46,6 +65,7 @@ export function useLiveNavigation({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [hasArrived, setHasArrived] = useState<boolean>(false);
   const [isRerouting, setIsRerouting] = useState<boolean>(false);
+  const [isCameraFollowing, setIsCameraFollowing] = useState<boolean>(true);
 
   const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
@@ -53,7 +73,14 @@ export function useLiveNavigation({
   const offRouteCountRef = useRef<number>(0);
   const lastRerouteAtRef = useRef<number>(0);
   const hasArrivedRef = useRef<boolean>(false);
-  const lastSpokenKeyRef = useRef<string>("");
+  const isCameraFollowingRef = useRef<boolean>(true);
+
+  const currentStepIdxRef = useRef<number>(0);
+  const lastAnnouncedStepRef = useRef<number>(-1);
+  const lastSpokenAtRef = useRef<number>(0);
+  const spokenMilestonesRef = useRef<Set<number>>(new Set());
+  const stepInitialDistRef = useRef<number>(0);
+  const speechTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const routeCoordsRef = useRef(routeCoords);
   const routeStepsRef = useRef(routeSteps);
@@ -69,23 +96,150 @@ export function useLiveNavigation({
   destinationNameRef.current = destinationName;
   onRerouteRef.current = onReroute;
 
-  const speakPrompt = useCallback((text: string) => {
-    if (isMutedRef.current || !text) return;
-    try {
-      Speech.stop();
-      Speech.speak(text, { language: "en", rate: 1.0 });
-    } catch {
-      // Ignore speech failures on unsupported simulators
-    }
-  }, []);
-
   const stopSpeech = useCallback(() => {
+    if (speechTimeoutRef.current) {
+      clearTimeout(speechTimeoutRef.current);
+      speechTimeoutRef.current = null;
+    }
     try {
       Speech.stop();
     } catch {
       // Ignore
     }
   }, []);
+
+  const speakPrompt = useCallback((text: string, options?: { interrupt?: boolean }) => {
+    if (isMutedRef.current || !text) return;
+    const cleaned = text.replace(/\s+/g, " ").trim();
+    if (!cleaned) return;
+
+    lastSpokenAtRef.current = Date.now();
+    const interrupt = options?.interrupt ?? false;
+
+    try {
+      if (interrupt) {
+        if (speechTimeoutRef.current) {
+          clearTimeout(speechTimeoutRef.current);
+        }
+        Speech.stop();
+        speechTimeoutRef.current = setTimeout(() => {
+          speechTimeoutRef.current = null;
+          if (!isMutedRef.current) {
+            Speech.speak(cleaned, { language: "en-US", rate: 0.98, pitch: 1.0 });
+          }
+        }, 85);
+      } else {
+        Speech.isSpeakingAsync()
+          .then((speaking) => {
+            if (!speaking && !isMutedRef.current) {
+              Speech.speak(cleaned, { language: "en-US", rate: 0.98, pitch: 1.0 });
+            }
+          })
+          .catch(() => {
+            if (!isMutedRef.current) {
+              Speech.speak(cleaned, { language: "en-US", rate: 0.98, pitch: 1.0 });
+            }
+          });
+      }
+    } catch {
+      // Ignore speech failures on unsupported simulators
+    }
+  }, []);
+
+  const evaluateVoiceGuidance = useCallback(
+    (
+      nextStepIdx: number,
+      segIndex: number,
+      position: Coordinate,
+      remTotalDist: number,
+      activeCoords: Coordinate[],
+      activeSteps: RouteStep[]
+    ) => {
+      if (isMutedRef.current || hasArrivedRef.current || activeSteps.length === 0) return;
+
+      const currStep = activeSteps[nextStepIdx] || activeSteps[0];
+      const upcomingStep = activeSteps[nextStepIdx + 1];
+      const distToTurn = currStep?.end_location
+        ? calculateDistanceAlongRouteToPoint(segIndex, position, currStep.end_location, activeCoords)
+        : currStep?.distance_meters ?? remTotalDist;
+
+      // 1. Step transition announcement (immediate interrupt)
+      if (nextStepIdx !== lastAnnouncedStepRef.current) {
+        lastAnnouncedStepRef.current = nextStepIdx;
+        spokenMilestonesRef.current.clear();
+        stepInitialDistRef.current = Math.max(distToTurn, currStep?.distance_meters ?? distToTurn);
+
+        const baseInstruction = cleanInstructionText(currStep?.instruction);
+        let prompt = `${baseInstruction}.`;
+        if (upcomingStep && upcomingStep.maneuver !== "arrive" && distToTurn >= 45) {
+          prompt = `${baseInstruction}. In ${formatSpokenDistance(distToTurn)}, ${cleanInstructionText(
+            upcomingStep.instruction
+          ).toLowerCase()}.`;
+        } else if (upcomingStep?.maneuver === "arrive" && distToTurn >= 45) {
+          prompt = `${baseInstruction}. Continue ${formatSpokenDistance(distToTurn)} to ${
+            destinationNameRef.current || "your destination"
+          }.`;
+        }
+        speakPrompt(prompt, { interrupt: true });
+        return;
+      }
+
+      const now = Date.now();
+      const elapsedSinceLastSpeech = now - lastSpokenAtRef.current;
+
+      // 2. Distance-to-maneuver milestone callouts (600m, 300m, 150m, 60m)
+      if (elapsedSinceLastSpeech >= 5500) {
+        for (const threshold of MILESTONE_METERS) {
+          if (
+            stepInitialDistRef.current >= threshold + 35 &&
+            distToTurn <= threshold &&
+            distToTurn >= threshold - 35 &&
+            !spokenMilestonesRef.current.has(threshold)
+          ) {
+            spokenMilestonesRef.current.add(threshold);
+            const distWords = formatSpokenDistance(distToTurn);
+            if (upcomingStep && upcomingStep.maneuver !== "arrive") {
+              speakPrompt(`In ${distWords}, ${cleanInstructionText(upcomingStep.instruction).toLowerCase()}.`, {
+                interrupt: false
+              });
+            } else {
+              speakPrompt(
+                `In ${distWords}, you will arrive at ${destinationNameRef.current || "your destination"}.`,
+                { interrupt: false }
+              );
+            }
+            return;
+          }
+        }
+      }
+
+      // 3. Periodic time-interval progress update on long segments (every 18s)
+      if (elapsedSinceLastSpeech >= PERIODIC_VOICE_INTERVAL_MS && distToTurn > 45) {
+        const roadLabel =
+          currStep?.road_name && currStep.road_name !== "Campus Pathway"
+            ? currStep.road_name
+            : "the current pathway";
+        const distWords = formatSpokenDistance(distToTurn);
+
+        if (upcomingStep && upcomingStep.maneuver !== "arrive") {
+          speakPrompt(
+            `Continue on ${roadLabel} for ${distWords}, then ${cleanInstructionText(
+              upcomingStep.instruction
+            ).toLowerCase()}.`,
+            { interrupt: false }
+          );
+        } else {
+          speakPrompt(
+            `Continue on ${roadLabel} for ${distWords} to reach ${
+              destinationNameRef.current || "your destination"
+            }.`,
+            { interrupt: false }
+          );
+        }
+      }
+    },
+    [speakPrompt]
+  );
 
   const stopSimulation = useCallback(() => {
     setIsSimulating(false);
@@ -111,9 +265,14 @@ export function useLiveNavigation({
       stopAll();
       simProgressRef.current = { index: 0, fraction: 0 };
       hasArrivedRef.current = false;
-      lastSpokenKeyRef.current = "";
+      isCameraFollowingRef.current = true;
+      currentStepIdxRef.current = 0;
+      lastAnnouncedStepRef.current = -1;
+      spokenMilestonesRef.current.clear();
+
       setHasArrived(false);
       setIsRerouting(false);
+      setIsCameraFollowing(true);
       setCurrentStepIdx(0);
       setNavSegIndex(0);
 
@@ -123,9 +282,12 @@ export function useLiveNavigation({
       setNavBearing(initialBearing);
       setNavSpeedKmh(0);
 
-      if (typeof distanceMeters === "number") {
-        setRemainingDistanceMeters(distanceMeters);
-      }
+      const totalDist =
+        typeof distanceMeters === "number"
+          ? distanceMeters
+          : calculateRemainingRouteDistance(0, initialPoint, coords);
+      setRemainingDistanceMeters(totalDist);
+
       if (typeof durationSeconds === "number") {
         setRemainingDurationSeconds(durationSeconds);
       }
@@ -140,13 +302,11 @@ export function useLiveNavigation({
         { duration: 800 }
       );
 
-      if (steps[0]?.instruction) {
-        const key = `${coords[0]?.latitude}-${coords[0]?.longitude}-0`;
-        lastSpokenKeyRef.current = key;
-        speakPrompt(steps[0].instruction);
+      if (steps.length > 0 && initialPoint) {
+        evaluateVoiceGuidance(0, 0, initialPoint, totalDist, coords, steps);
       }
     },
-    [mapRef, speakPrompt, stopAll]
+    [evaluateVoiceGuidance, mapRef, stopAll]
   );
 
   const startSimulation = useCallback(() => {
@@ -158,10 +318,12 @@ export function useLiveNavigation({
       simulationTimerRef.current = null;
     }
 
-    // Resume from paused position unless finished
     if (simProgressRef.current.index >= coords.length - 1 || hasArrivedRef.current) {
       simProgressRef.current = { index: 0, fraction: 0 };
       hasArrivedRef.current = false;
+      currentStepIdxRef.current = 0;
+      lastAnnouncedStepRef.current = -1;
+      spokenMilestonesRef.current.clear();
       setHasArrived(false);
       setCurrentStepIdx(0);
       setNavSegIndex(0);
@@ -170,7 +332,7 @@ export function useLiveNavigation({
     setIsSimulating(true);
     const isDriving = travelModeRef.current === "driving";
     setNavSpeedKmh(isDriving ? 26 : 5);
-    const metersPerTick = isDriving ? 4.2 : 1.2;
+    const metersPerTick = isDriving ? 4.2 : 1.5;
 
     simulationTimerRef.current = setInterval(() => {
       const activeCoords = routeCoordsRef.current;
@@ -198,13 +360,19 @@ export function useLiveNavigation({
       if (stepRes.arrived) {
         setRemainingDistanceMeters(0);
         setRemainingDurationSeconds(0);
-        setCurrentStepIdx(Math.max(0, activeSteps.length - 1));
+        const lastIdx = Math.max(0, activeSteps.length - 1);
+        currentStepIdxRef.current = lastIdx;
+        setCurrentStepIdx(lastIdx);
         hasArrivedRef.current = true;
         setHasArrived(true);
         stopSimulation();
         const dest = destinationNameRef.current || "your destination";
-        speakPrompt(`You have arrived at ${dest}.`);
-        Alert.alert("Arrived!", `You have reached ${dest}.`);
+        speakPrompt(`You have arrived at ${dest}.`, { interrupt: true });
+        showAppAlert({
+          title: "Arrived at Destination",
+          message: `You have reached ${dest}.`,
+          variant: "success"
+        });
         return;
       }
 
@@ -215,37 +383,49 @@ export function useLiveNavigation({
       setRemainingDistanceMeters(remainingDist);
       setRemainingDurationSeconds(remainingSecs);
 
-      setCurrentStepIdx((prevIdx) => {
-        let nextIdx = prevIdx;
-        while (nextIdx < activeSteps.length - 1) {
-          const stepEnd = activeSteps[nextIdx]?.end_location;
-          if (!stepEnd) break;
-          const distAlong = calculateDistanceAlongRouteToPoint(
-            stepRes.index,
-            stepRes.position,
-            stepEnd,
-            activeCoords
-          );
-          if (distAlong < 12 || haversineMeters(stepRes.position, stepEnd) < 12) {
-            nextIdx += 1;
-          } else {
-            break;
-          }
+      let nextIdx = currentStepIdxRef.current;
+      while (nextIdx < activeSteps.length - 1) {
+        const stepEnd = activeSteps[nextIdx]?.end_location;
+        if (!stepEnd) break;
+        const distAlong = calculateDistanceAlongRouteToPoint(
+          stepRes.index,
+          stepRes.position,
+          stepEnd,
+          activeCoords
+        );
+        if (distAlong < 14 || haversineMeters(stepRes.position, stepEnd) < 14) {
+          nextIdx += 1;
+        } else {
+          break;
         }
-        return nextIdx;
-      });
+      }
+      if (nextIdx !== currentStepIdxRef.current) {
+        currentStepIdxRef.current = nextIdx;
+        setCurrentStepIdx(nextIdx);
+      }
 
-      mapRef.current?.animateCamera(
-        {
-          center: stepRes.position,
-          heading: stepRes.bearing,
-          pitch: 45,
-          zoom: 18.5
-        },
-        { duration: 480 }
+      evaluateVoiceGuidance(
+        nextIdx,
+        stepRes.index,
+        stepRes.position,
+        remainingDist,
+        activeCoords,
+        activeSteps
       );
+
+      if (isCameraFollowingRef.current) {
+        mapRef.current?.animateCamera(
+          {
+            center: stepRes.position,
+            heading: stepRes.bearing,
+            pitch: 45,
+            zoom: 18.5
+          },
+          { duration: 480 }
+        );
+      }
     }, 500);
-  }, [mapRef, speakPrompt, stopSimulation]);
+  }, [evaluateVoiceGuidance, mapRef, speakPrompt, stopSimulation]);
 
   const toggleSimulation = useCallback(() => {
     if (isSimulating) {
@@ -258,12 +438,30 @@ export function useLiveNavigation({
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
       const next = !prev;
-      if (next) stopSpeech();
+      isMutedRef.current = next;
+      if (next) {
+        stopSpeech();
+      } else {
+        const activeSteps = routeStepsRef.current;
+        const step = activeSteps[currentStepIdxRef.current];
+        if (step?.instruction) {
+          speakPrompt(step.instruction, { interrupt: true });
+        }
+      }
       return next;
     });
-  }, [stopSpeech]);
+  }, [speakPrompt, stopSpeech]);
+
+  const pauseCameraFollow = useCallback(() => {
+    if (isCameraFollowingRef.current) {
+      isCameraFollowingRef.current = false;
+      setIsCameraFollowing(false);
+    }
+  }, []);
 
   const recenterCamera = useCallback(() => {
+    isCameraFollowingRef.current = true;
+    setIsCameraFollowing(true);
     if (!navLocation) return;
     mapRef.current?.animateCamera(
       {
@@ -275,18 +473,6 @@ export function useLiveNavigation({
       { duration: 500 }
     );
   }, [mapRef, navBearing, navLocation]);
-
-  // Speak step change during active navigation
-  useEffect(() => {
-    if (!isActive || hasArrived || isMuted) return;
-    const step = routeSteps[currentStepIdx];
-    if (!step?.instruction) return;
-    const key = `${routeCoords[0]?.latitude}-${routeCoords[0]?.longitude}-${currentStepIdx}`;
-    if (lastSpokenKeyRef.current !== key) {
-      lastSpokenKeyRef.current = key;
-      speakPrompt(step.instruction);
-    }
-  }, [isActive, hasArrived, isMuted, currentStepIdx, routeSteps, routeCoords, speakPrompt]);
 
   // Real-time GPS tracking with off-route rerouting & arrival detection
   useEffect(() => {
@@ -328,21 +514,22 @@ export function useLiveNavigation({
             const snap = findNearestPointOnRoute(userCoord, activeCoords);
             if (!snap) return;
 
-            // Off-route rerouting (>35m away twice consecutively, throttled 8s)
             if (snap.distanceFromRoute > 35 && !hasArrivedRef.current) {
               offRouteCountRef.current += 1;
               if (offRouteCountRef.current >= 2 && Date.now() - lastRerouteAtRef.current >= 8000) {
                 offRouteCountRef.current = 0;
                 lastRerouteAtRef.current = Date.now();
                 setIsRerouting(true);
-                speakPrompt("Recalculating route.");
+                speakPrompt("Off route. Recalculating directions.", { interrupt: true });
                 onRerouteRef
                   .current(userCoord)
                   .then(() => {
                     if (!isMounted) return;
+                    currentStepIdxRef.current = 0;
+                    lastAnnouncedStepRef.current = -1;
+                    spokenMilestonesRef.current.clear();
                     setCurrentStepIdx(0);
                     setNavSegIndex(0);
-                    lastSpokenKeyRef.current = "";
                     simProgressRef.current = { index: 0, fraction: 0 };
                   })
                   .catch(() => {})
@@ -374,45 +561,63 @@ export function useLiveNavigation({
               setHasArrived(true);
               setRemainingDistanceMeters(0);
               setRemainingDurationSeconds(0);
-              setCurrentStepIdx(Math.max(0, activeSteps.length - 1));
+              const lastIdx = Math.max(0, activeSteps.length - 1);
+              currentStepIdxRef.current = lastIdx;
+              setCurrentStepIdx(lastIdx);
               const dest = destinationNameRef.current || "your destination";
-              speakPrompt(`You have arrived at ${dest}.`);
-              Alert.alert("Arrived!", `You have reached ${dest}.`);
+              speakPrompt(`You have arrived at ${dest}.`, { interrupt: true });
+              showAppAlert({
+                title: "Arrived at Destination",
+                message: `You have reached ${dest}.`,
+                variant: "success"
+              });
               return;
             }
 
             setRemainingDistanceMeters(remDist);
             setRemainingDurationSeconds(remSecs);
 
-            setCurrentStepIdx((prevIdx) => {
-              let nextIdx = prevIdx;
-              while (nextIdx < activeSteps.length - 1) {
-                const stepEnd = activeSteps[nextIdx]?.end_location;
-                if (!stepEnd) break;
-                const distAlong = calculateDistanceAlongRouteToPoint(
-                  snap.segIndex,
-                  snap.projected,
-                  stepEnd,
-                  activeCoords
-                );
-                if (distAlong < 15 || haversineMeters(snap.projected, stepEnd) < 15) {
-                  nextIdx += 1;
-                } else {
-                  break;
-                }
+            let nextIdx = currentStepIdxRef.current;
+            while (nextIdx < activeSteps.length - 1) {
+              const stepEnd = activeSteps[nextIdx]?.end_location;
+              if (!stepEnd) break;
+              const distAlong = calculateDistanceAlongRouteToPoint(
+                snap.segIndex,
+                snap.projected,
+                stepEnd,
+                activeCoords
+              );
+              if (distAlong < 15 || haversineMeters(snap.projected, stepEnd) < 15) {
+                nextIdx += 1;
+              } else {
+                break;
               }
-              return nextIdx;
-            });
+            }
+            if (nextIdx !== currentStepIdxRef.current) {
+              currentStepIdxRef.current = nextIdx;
+              setCurrentStepIdx(nextIdx);
+            }
 
-            mapRef.current?.animateCamera(
-              {
-                center: snap.projected,
-                heading: brng,
-                pitch: 45,
-                zoom: 18.5
-              },
-              { duration: 800 }
+            evaluateVoiceGuidance(
+              nextIdx,
+              snap.segIndex,
+              snap.projected,
+              remDist,
+              activeCoords,
+              activeSteps
             );
+
+            if (isCameraFollowingRef.current) {
+              mapRef.current?.animateCamera(
+                {
+                  center: snap.projected,
+                  heading: brng,
+                  pitch: 45,
+                  zoom: 18.5
+                },
+                { duration: 800 }
+              );
+            }
           }
         );
       } catch {
@@ -429,9 +634,8 @@ export function useLiveNavigation({
         locationSubRef.current = null;
       }
     };
-  }, [isActive, isSimulating, mapRef, speakPrompt]);
+  }, [evaluateVoiceGuidance, isActive, isSimulating, mapRef, speakPrompt]);
 
-  // Cleanup all subscriptions, timers, and speech on unmount
   useEffect(() => {
     return () => {
       stopAll();
@@ -440,6 +644,7 @@ export function useLiveNavigation({
 
   const currentStep = routeSteps[currentStepIdx] || routeSteps[0];
   const nextStep = routeSteps[currentStepIdx + 1];
+  const thenStep = routeSteps[currentStepIdx + 2];
 
   const distToNextManeuver = useMemo(() => {
     if (hasArrived) return 0;
@@ -455,6 +660,7 @@ export function useLiveNavigation({
     navSpeedKmh,
     currentStep,
     nextStep,
+    thenStep,
     currentStepIdx,
     distToNextManeuver,
     remainingDistanceMeters,
@@ -463,10 +669,12 @@ export function useLiveNavigation({
     isMuted,
     hasArrived,
     isRerouting,
+    isCameraFollowing,
     startSession,
     stopAll,
     toggleSimulation,
     toggleMute,
+    pauseCameraFollow,
     recenterCamera
   };
 }

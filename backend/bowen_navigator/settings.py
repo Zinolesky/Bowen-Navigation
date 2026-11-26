@@ -123,15 +123,27 @@ DATABASES = {
     }
 }
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "bowen-navigator-cache",
-        "OPTIONS": {
-            "MAX_ENTRIES": 2000,
-        },
+REDIS_URL = config("REDIS_URL", default="")
+IS_TEST_RUN = "test" in sys.argv
+
+if REDIS_URL and not IS_TEST_RUN:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "KEY_PREFIX": "bowen",
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "bowen-navigator-cache",
+            "OPTIONS": {
+                "MAX_ENTRIES": 2000,
+            },
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -161,6 +173,44 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": config("THROTTLE_ANON", default="120/min"),
+        "user": config("THROTTLE_USER", default="600/min"),
+        "auth": config("THROTTLE_AUTH", default="20/min"),
+        "places": config("THROTTLE_PLACES", default="60/min"),
+    },
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": config("DJANGO_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+        "campus": {
+            "handlers": ["console"],
+            "level": config("CAMPUS_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+    },
 }
 
 

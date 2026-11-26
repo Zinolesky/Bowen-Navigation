@@ -13,18 +13,24 @@ type PolylineItem = {
 
 export const CampusTracksLayer = React.memo(function CampusTracksLayer({
   drivewayPolylines,
-  standaloneWalkwayPolylines
+  standaloneWalkwayPolylines,
+  isDark = false
 }: {
   drivewayPolylines: PolylineItem[];
   standaloneWalkwayPolylines: PolylineItem[];
+  isDark?: boolean;
 }) {
+  const driveOuter = isDark ? "rgba(15, 23, 42, 0.85)" : "rgba(71, 85, 105, 0.65)";
+  const driveInner = isDark ? "rgba(100, 116, 139, 0.92)" : "rgba(226, 232, 240, 0.92)";
+  const walkwayColor = isDark ? "#2DD4BF" : "#0D9488";
+
   return (
     <>
       {drivewayPolylines.map((drive) => (
         <React.Fragment key={drive.id}>
           <Polyline
             coordinates={drive.coords}
-            strokeColor="rgba(71, 85, 105, 0.65)"
+            strokeColor={driveOuter}
             strokeWidth={6}
             lineCap="round"
             lineJoin="round"
@@ -32,7 +38,7 @@ export const CampusTracksLayer = React.memo(function CampusTracksLayer({
           />
           <Polyline
             coordinates={drive.coords}
-            strokeColor="rgba(226, 232, 240, 0.92)"
+            strokeColor={driveInner}
             strokeWidth={3.2}
             lineCap="round"
             lineJoin="round"
@@ -45,7 +51,7 @@ export const CampusTracksLayer = React.memo(function CampusTracksLayer({
         <Polyline
           key={walk.id}
           coordinates={walk.coords}
-          strokeColor="#0D9488"
+          strokeColor={walkwayColor}
           strokeWidth={3}
           lineDashPattern={[5, 5]}
           lineCap="round"

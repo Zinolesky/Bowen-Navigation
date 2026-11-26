@@ -5,7 +5,13 @@ export default {
     scheme: "bowennavigator",
     version: "1.0.0",
     orientation: "portrait",
-    userInterfaceStyle: "light",
+    userInterfaceStyle: "automatic",
+    icon: "./assets/icon.png",
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#0B4F4A"
+    },
     owner: "bowen-navigator",
     ios: {
       supportsTablet: false,
@@ -14,13 +20,15 @@ export default {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY || ""
       },
       infoPlist: {
-        NSLocationWhenInUseUsageDescription: "Bowen Navigator uses your location to calculate walking directions on campus."
+        NSLocationWhenInUseUsageDescription:
+          "Bowen Navigator uses your location to calculate walking directions on campus."
       }
     },
     android: {
       package: "ng.edu.bowen.navigator",
       adaptiveIcon: {
-        backgroundColor: "#0F766E"
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#0B4F4A"
       },
       permissions: ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       config: {

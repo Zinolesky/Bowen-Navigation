@@ -1,18 +1,23 @@
+import logging
 import math
+import time
+from typing import Optional
 from urllib.parse import quote
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
 from django.db.models import Q
 from django.http import HttpResponse
 import requests
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Building, Category, PointOfInterest, Track
-from .permissions import IsStaffAdminOrReadOnly
+from .permissions import IsStaffAdmin, IsStaffAdminOrReadOnly
+from .roster import import_students_from_csv_text
 from .routing import dijkstra_route
 from .serializers import (
     BuildingSerializer,
@@ -20,13 +25,22 @@ from .serializers import (
     LoginSerializer,
     PointOfInterestGeoSerializer,
     PointOfInterestWriteSerializer,
+    RegisterSerializer,
     TrackGeoSerializer,
 )
 from .signals import get_campus_cache_version
+from .throttles import AuthRateThrottle, PlacesRateThrottle
+
+logger = logging.getLogger(__name__)
 
 _google_session = requests.Session()
 _PLACE_DETAILS_TTL = 3600
 _PLACE_PHOTO_TTL = 86400
+_MAX_CSV_UPLOAD_BYTES = 2 * 1024 * 1024
+
+
+def _is_staff_admin_user(user) -> bool:
+    return bool(user and user.is_authenticated and (getattr(user, "is_staff_admin", False) or user.is_staff))
 
 
 def _etag_matches(request, etag: str) -> bool:
@@ -59,20 +73,112 @@ def _cached_etag_response(request, suffix: str, cache_key: str, builder):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@throttle_classes([])
 def health_check(request):
-    return Response({"status": "ok", "service": "Bowen Navigator API"})
+    start = time.perf_counter()
+    db_status = "ok"
+    cache_status = "ok"
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:
+        db_status = "error"
+        logger.exception("Health check database probe failed")
+
+    try:
+        cache.set("health:ping", "ok", timeout=10)
+        if cache.get("health:ping") != "ok":
+            cache_status = "error"
+    except Exception:
+        cache_status = "error"
+        logger.warning("Health check cache probe degraded", exc_info=True)
+
+    latency_ms = round((time.perf_counter() - start) * 1000.0, 2)
+    if db_status != "ok":
+        overall = "unhealthy"
+        http_status = status.HTTP_503_SERVICE_UNAVAILABLE
+    elif cache_status != "ok":
+        overall = "degraded"
+        http_status = status.HTTP_200_OK
+    else:
+        overall = "ok"
+        http_status = status.HTTP_200_OK
+
+    return Response(
+        {
+            "status": overall,
+            "service": "Bowen Navigator API",
+            "checks": {
+                "database": db_status,
+                "cache": cache_status,
+            },
+            "latency_ms": latency_ms,
+        },
+        status=http_status,
+    )
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([AuthRateThrottle])
+def register(request):
+    serializer = RegisterSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    logger.info("Registered student account %s", serializer.instance.matric_number)
+    return Response(serializer.create_token_response(), status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([AuthRateThrottle])
 def login(request):
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     return Response(serializer.create_token_response())
 
 
+@api_view(["POST"])
+@permission_classes([IsStaffAdmin])
+def import_students(request):
+    uploaded = request.FILES.get("file") if hasattr(request, "FILES") else None
+    if uploaded is not None:
+        if uploaded.size > _MAX_CSV_UPLOAD_BYTES:
+            return Response(
+                {"detail": "CSV file must be 2 MB or smaller."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            csv_text = uploaded.read().decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return Response(
+                {"detail": "CSV file must be UTF-8 encoded."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        csv_text = (request.data.get("csv_text") or "") if isinstance(request.data, dict) else ""
+
+    if not isinstance(csv_text, str) or not csv_text.strip():
+        return Response(
+            {"detail": "Provide CSV text ('csv_text') or upload a CSV 'file'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    summary = import_students_from_csv_text(csv_text)
+    logger.info(
+        "Admin %s imported student roster: created=%s updated=%s skipped=%s",
+        request.user.matric_number,
+        summary["created"],
+        summary["updated"],
+        summary["skipped"],
+    )
+    return Response(summary)
+
+
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
@@ -86,13 +192,13 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class BuildingViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     queryset = Building.objects.all()
     serializer_class = BuildingSerializer
 
 
 class TrackViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     queryset = Track.objects.all()
     serializer_class = TrackGeoSerializer
 
@@ -121,9 +227,15 @@ class PointOfInterestViewSet(viewsets.ModelViewSet):
         ctx["include_sprites"] = self.request.query_params.get("include_sprites") == "true"
         return ctx
 
+    def _allow_inactive(self) -> bool:
+        return (
+            self.request.query_params.get("include_inactive") == "true"
+            and _is_staff_admin_user(self.request.user)
+        )
+
     def get_queryset(self):
         queryset = PointOfInterest.objects.select_related("category", "building")
-        if self.request.query_params.get("include_inactive") != "true":
+        if not self._allow_inactive():
             queryset = queryset.filter(is_active=True)
 
         search = self.request.query_params.get("search")
@@ -150,7 +262,7 @@ class PointOfInterestViewSet(viewsets.ModelViewSet):
         search = request.query_params.get("search")
         category = request.query_params.get("category")
         if not search and not category:
-            include_inactive = request.query_params.get("include_inactive") == "true"
+            include_inactive = self._allow_inactive()
             include_sprites = request.query_params.get("include_sprites") == "true"
             suffix = f"pois-{int(include_inactive)}-{int(include_sprites)}"
             return _cached_etag_response(
@@ -163,7 +275,7 @@ class PointOfInterestViewSet(viewsets.ModelViewSet):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def campus_bootstrap(request):
     include_sprites = request.query_params.get("include_sprites") == "true"
     version = get_campus_cache_version()
@@ -213,7 +325,7 @@ def _read_coordinate(data, key):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def directions(request):
     try:
         origin = _read_coordinate(request.data, "origin")
@@ -234,15 +346,89 @@ def directions(request):
     return Response(route)
 
 
+def _resolve_place_id_from_google(api_key: str, name: str, lat: Optional[float], lon: Optional[float]) -> str:
+    if not name:
+        return ""
+    try:
+        params = {
+            "input": f"{name} Bowen University Iwo",
+            "inputtype": "textquery",
+            "fields": "place_id,name,geometry",
+            "key": api_key,
+        }
+        if lat is not None and lon is not None:
+            params["locationbias"] = f"circle:450@{lat},{lon}"
+        resp = _google_session.get(
+            "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
+            params=params,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        candidates = resp.json().get("candidates") or []
+        for cand in candidates:
+            cand_id = (cand.get("place_id") or "").strip()
+            if not cand_id:
+                continue
+            if lat is not None and lon is not None:
+                loc = cand.get("geometry", {}).get("location", {})
+                clat, clon = loc.get("lat"), loc.get("lng")
+                if clat is not None and clon is not None:
+                    d_lat = math.radians(float(clat) - lat)
+                    d_lon = math.radians(float(clon) - lon)
+                    a = (
+                        math.sin(d_lat / 2) ** 2
+                        + math.cos(math.radians(lat))
+                        * math.cos(math.radians(float(clat)))
+                        * math.sin(d_lon / 2) ** 2
+                    )
+                    dist_m = 6371000.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1.0 - a)))
+                    if dist_m > 800.0:
+                        continue
+            return cand_id
+    except requests.RequestException:
+        pass
+    return ""
+
+
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+@throttle_classes([PlacesRateThrottle])
 def place_details(request):
-    place_id = (request.data.get("place_id") or "").strip() if isinstance(request.data, dict) else ""
-    if not place_id or len(place_id) > 255:
-        return Response({"detail": "place_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+    payload = request.data if isinstance(request.data, dict) else {}
+    place_id = (payload.get("place_id") or "").strip()
+    poi_id = payload.get("poi_id")
+    poi_name = (payload.get("name") or "").strip()
+    raw_lat = payload.get("latitude")
+    raw_lon = payload.get("longitude")
+
+    lat_val = None
+    lon_val = None
+    try:
+        if raw_lat is not None and raw_lon is not None:
+            lat_val = float(raw_lat)
+            lon_val = float(raw_lon)
+    except (TypeError, ValueError):
+        pass
+
+    poi_obj = None
+    if poi_id is not None:
+        try:
+            poi_obj = PointOfInterest.objects.filter(pk=int(poi_id)).first()
+            if poi_obj:
+                if not place_id and poi_obj.google_place_id:
+                    place_id = poi_obj.google_place_id.strip()
+                if not poi_name:
+                    poi_name = poi_obj.name
+                if (lat_val is None or lon_val is None) and poi_obj.location:
+                    lat_val = poi_obj.location.y
+                    lon_val = poi_obj.location.x
+        except (TypeError, ValueError):
+            pass
 
     api_key = settings.GOOGLE_PLACES_API_KEY
     if not api_key:
+        if not place_id and not poi_name:
+            return Response({"detail": "place_id is required."}, status=status.HTTP_400_BAD_REQUEST)
         return Response(
             {
                 "status": "DISABLED",
@@ -250,7 +436,18 @@ def place_details(request):
             }
         )
 
-    cache_key = f"place_details:{place_id}"
+    if not place_id and poi_name:
+        resolved = _resolve_place_id_from_google(api_key, poi_name, lat_val, lon_val)
+        if resolved:
+            place_id = resolved
+            if poi_obj and not poi_obj.google_place_id:
+                poi_obj.google_place_id = resolved
+                poi_obj.save(update_fields=["google_place_id", "updated_at"])
+
+    if not place_id or len(place_id) > 255:
+        return Response({"detail": "place_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    cache_key = f"place_details:v2:{place_id}"
     cached = cache.get(cache_key)
     if cached is not None:
         return Response(cached)
@@ -260,7 +457,11 @@ def place_details(request):
             "https://maps.googleapis.com/maps/api/place/details/json",
             params={
                 "place_id": place_id,
-                "fields": "name,formatted_address,geometry,opening_hours,website,formatted_phone_number,photos,rating,user_ratings_total",
+                "fields": (
+                    "name,formatted_address,geometry,opening_hours,website,"
+                    "formatted_phone_number,photos,rating,user_ratings_total,"
+                    "editorial_summary,reviews,types,business_status,url,plus_code"
+                ),
                 "key": api_key,
             },
             timeout=15,
@@ -291,7 +492,8 @@ def place_details(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+@throttle_classes([PlacesRateThrottle])
 def place_photo(request):
     ref = (request.query_params.get("ref") or "").strip()
     if not ref or len(ref) > 1024:
